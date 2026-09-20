@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Reports — AI Career Intelligence Platform{% endblock %}
+{% block page_title %}Reports{% endblock %}
+
+{% block content %}
+<div class="stagger-children">
+
+<!-- ── HEADER ─────────────────────────────────────────────── -->
+<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-4); margin-bottom:var(--space-6);" class="fade-in-up">
+    <div>
+        <h1 style="font-size:var(--text-2xl); font-weight:800; margin-bottom:var(--space-1);">Career Reports</h1>
+        <p style="color:var(--text-3); font-size:var(--text-sm); margin:0;">Generate downloadable PDF reports of your career readiness and analysis results.</p>
+    </div>
+</div>
+
+<!-- ── STATS ─────────────────────────────────────────────── -->
+{% if averages %}
+<div class="stat-row fade-in-up-delay-1" style="margin-bottom:var(--space-6);">
+    <div class="stat-card">
+        <div class="stat-card-label">Overall Career Readiness</div>
+        <div class="stat-card-value" data-count-to="{{ averages.avg_career | int }}">0</div>
+        <div class="stat-card-sub" style="font-size:var(--text-xs);">Average across all analyses</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-label">ATS Score Average</div>
+        <div class="stat-card-value" data-count-to="{{ averages.avg_ats | int }}">0</div>
+        <div class="stat-card-sub" style="font-size:var(--text-xs);">Applicant tracking system</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-label">Skill Match Average</div>
+        <div class="stat-card-value" data-count-to="{{ averages.avg_skill | int }}">0</div>
+        <div class="stat-card-sub" style="font-size:var(--text-xs);">Against target companies</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-label">Analyses Complete</div>
+        <div class="stat-card-value" data-count-to="{{ averages.total_analyses | int }}">0</div>
+        <div class="stat-card-sub" style="font-size:var(--text-xs);">Total analyses run</div>
+    </div>
+</div>
+{% endif %}
+
+<div style="display:grid; grid-template-columns:1fr 360px; gap:var(--space-5);">
+
+<!-- ── LEFT: GENERATED REPORTS ─────────────────────────── -->
+<div class="fade-in-up-delay-2">
+    {% if reports %}
+    <div class="section-header" style="margin-bottom:var(--space-4);">
+        <div class="section-title"><i class="bi bi-file-bar-graph-fill"></i> Your Reports</div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+        {% for report in reports %}
+        <div class="card">
+            <div class="card-body" style="display:flex; align-items:center; gap:var(--space-4);">
+                <!-- Icon -->
+                <div style="width:48px; height:48px; border-radius:var(--radius-md); background:var(--danger-100); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <i class="bi bi-file-pdf-fill" style="color:var(--danger); font-size:1.3rem;"></i>
+                </div>
+
+                <div style="flex:1; min-width:0;">
+                    <div style="font-size:var(--text-sm); font-weight:700; color:var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                        {{ report.title }}
+                    </div>
+                    <div style="font-size:var(--text-xs); color:var(--text-3); margin-top:2px; display:flex; align-items:center; gap:var(--space-3);">
+                        <span><i class="bi bi-calendar3"></i> {{ report.created_at.strftime('%d %b %Y, %H:%M') if report.created_at else '' }}</span>
+                        <span class="badge badge-neutral" style="font-size:0.65rem;">{{ report.report_type }}</span>
+                        <span class="badge badge-danger" style="font-size:0.65rem;">PDF</span>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:var(--space-2);">
+                    <a href="{{ url_for('reports.download', report_id=report.id) }}" class="btn btn-sm btn-primary" title="Download PDF">
+                        <i class="bi bi-download"></i> Download
+                    </a>
+                    <form action="{{ url_for('reports.delete', report_id=report.id) }}" method="POST"
+                          onsubmit="return confirm('Delete this report?')">
+                        <button type="submit" class="btn btn-sm btn-ghost" style="color:var(--danger);" title="Delete">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state card" style="min-height:300px;">
+        <div class="empty-state-icon"><i class="bi bi-file-bar-graph"></i></div>
+        <div class="empty-state-title">No reports generated yet</div>
+        <div class="empty-state-desc">Generate a report from the panel on the right. Reports are downloadable PDF summaries of your career readiness, ATS scores, and skill analysis.</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ── RIGHT: GENERATE PANEL ────────────────────────────── -->
+<div class="fade-in-up-delay-2">
+    <div class="card" style="position:sticky; top:calc(var(--topbar-h) + var(--space-4));">
+        <div class="card-header">
+            <span class="card-header-title"><i class="bi bi-file-earmark-plus-fill text-primary"></i> Generate Report</span>
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('reports.generate') }}" method="POST" id="reportForm">
+                <div style="display:flex; flex-direction:column; gap:var(--space-4);">
+
+                    <!-- Report Type -->
+                    <div>
+                        <label class="form-label">Report Type</label>
+                        {% set types = [
+                            ('Career', 'bi-briefcase-fill', 'Complete career readiness assessment'),
+                            ('ATS', 'bi-robot', 'ATS score breakdown & keyword analysis'),
+                            ('Resume', 'bi-file-earmark-text-fill', 'Detailed resume feedback report'),
+                            ('Skill', 'bi-code-slash', 'Skill gap analysis vs target companies'),
+                        ] %}
+                        <div style="display:flex; flex-direction:column; gap:var(--space-2);">
+                            {% for type_id, icon, desc in types %}
+                            <label style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3); border:1.5px solid var(--border); border-radius:var(--radius-md); cursor:pointer; transition:all var(--transition-fast);"
+                                   onmouseover="this.style.borderColor='var(--primary-400)'"
+                                   onmouseout="this.style.borderColor=document.getElementById('rt_{{ type_id }}').checked?'var(--primary)':'var(--border)'"
+                                   onclick="highlightType(this, '{{ type_id }}')">
+                                <input type="radio" name="report_type" id="rt_{{ type_id }}" value="{{ type_id }}" style="margin:0;"
+                                       {{ 'checked' if loop.first }}>
+                                <i class="bi {{ icon }}" style="color:var(--primary); font-size:1.1rem; flex-shrink:0;"></i>
+                                <div>
+                                    <div style="font-size:var(--text-sm); font-weight:600; color:var(--text-1);">{{ type_id }} Report</div>
+                                    <div style="font-size:var(--text-xs); color:var(--text-3);">{{ desc }}</div>
+                                </div>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Based on Analysis -->
+                    <div>
+                        <label class="form-label">Based on Analysis (optional)</label>
+                        <select class="form-select" name="analysis_id">
+                            <option value="">— Use latest analysis —</option>
+                            {% for a in analyses %}
+                            <option value="{{ a.id }}">{{ a.company_name or a.job_title }} — {{ a.overall_score }}%</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-gradient w-100" {% if not analyses %}disabled{% endif %}>
+                        <i class="bi bi-file-earmark-pdf-fill"></i> Generate PDF Report
+                    </button>
+
+                    {% if not analyses %}
+                    <div class="form-text" style="text-align:center; color:var(--warning);">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <a href="{{ url_for('analysis.index') }}">Run an analysis first →</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+</div><!-- grid -->
+</div><!-- stagger -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+function highlightType(label, typeId) {
+    document.querySelectorAll('[name="report_type"]').forEach(r => {
+        const lbl = r.closest('label');
+        if (lbl) lbl.style.borderColor = r.checked ? 'var(--primary)' : 'var(--border)';
+    });
+    label.style.borderColor = 'var(--primary)';
+}
+document.addEventListener('DOMContentLoaded', () => {
+    // Highlight first by default
+    const first = document.querySelector('[name="report_type"]:checked');
+    if (first) first.closest('label').style.borderColor = 'var(--primary)';
+
+    attachAIFormLoading('reportForm', [
+        'Gathering your analysis data…',
+        'Calculating career scores…',
+        'Compiling skills report…',
+        'Generating PDF…'
+    ]);
+});
+</script>
+{% endblock %}

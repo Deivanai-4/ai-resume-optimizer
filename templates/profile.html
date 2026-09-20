@@ -1,0 +1,726 @@
+{% extends "base.html" %}
+{% block title %}My Profile — AI Career Intelligence Platform{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="stagger-children">
+
+    <!-- ── PROFILE HEADER ────────────────────────────────────────── -->
+    <div class="card fade-in-up" style="margin-bottom:var(--space-5); overflow:visible;">
+        <div class="card-body" style="display:flex; align-items:center; gap:var(--space-6); flex-wrap:wrap;">
+            <!-- Avatar -->
+            <div class="profile-avatar-wrap">
+                {% if profile and profile.photo_path %}
+                <img src="{{ url_for('static', filename='uploads/' + profile.photo_path) }}" alt="{{ user.full_name }}"
+                    class="profile-avatar">
+                {% else %}
+                <div class="profile-avatar-initials">
+                    {{ (user.full_name or 'U')[0].upper() }}{% if user.full_name and ' ' in user.full_name %}{{
+                    user.full_name.split()[1][0].upper() }}{% endif %}
+                </div>
+                {% endif %}
+                <form action="{{ url_for('profile.upload_photo') }}" method="POST" enctype="multipart/form-data"
+                    id="photoForm">
+                    <label for="photoInput" class="profile-avatar-edit" title="Change photo">
+                        <i class="bi bi-camera-fill"></i>
+                    </label>
+                    <input type="file" id="photoInput" name="photo" accept="image/*" style="display:none"
+                        onchange="document.getElementById('photoForm').submit()">
+                </form>
+            </div>
+
+            <!-- Info -->
+            <div style="flex:1; min-width:200px;">
+                <h2 style="font-size:var(--text-2xl); font-weight:800; margin-bottom:var(--space-1);">
+                    {{ user.full_name or 'Your Name' }}
+                </h2>
+                <p style="color:var(--text-3); font-size:var(--text-sm); margin-bottom:var(--space-3);">
+                    {{ user.email }}
+                    {% if profile and profile.location %} &bull; <i class="bi bi-geo-alt"></i> {{ profile.location }}{%
+                    endif %}
+                </p>
+                <div style="display:flex; flex-wrap:wrap; gap:var(--space-2);">
+                    {% if profile and profile.linkedin_url %}
+                    <a href="{{ profile.linkedin_url }}" target="_blank" class="badge badge-info"
+                        style="text-decoration:none;">
+                        <i class="bi bi-linkedin"></i> LinkedIn
+                    </a>
+                    {% endif %}
+                    {% if profile and profile.github_url %}
+                    <a href="{{ profile.github_url }}" target="_blank" class="badge badge-neutral"
+                        style="text-decoration:none;">
+                        <i class="bi bi-github"></i> GitHub
+                    </a>
+                    {% endif %}
+                    {% if profile and profile.portfolio_url %}
+                    <a href="{{ profile.portfolio_url }}" target="_blank" class="badge badge-secondary"
+                        style="text-decoration:none;">
+                        <i class="bi bi-globe2"></i> Portfolio
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Completion Ring -->
+            <div style="text-align:center;">
+                <div data-ring="{{ profile_completion }}" data-ring-size="80"
+                    data-ring-color="{{ 'var(--success)' if profile_completion >= 80 else 'var(--primary)' if profile_completion >= 50 else 'var(--warning)' }}"
+                    data-ring-label="Complete" style="margin:0 auto var(--space-2);"></div>
+                <div style="font-size:var(--text-xs); font-weight:600; color:var(--text-3);">Profile Score</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── TAB NAV ───────────────────────────────────────────────── -->
+    <div class="nav-tabs-line fade-in-up-delay-1" style="margin-bottom:var(--space-5);" data-tab-group="profile">
+        <button class="tab-btn active" data-tab="basic" id="tab-basic">
+            <i class="bi bi-person me-1"></i> Basic Info
+        </button>
+        <button class="tab-btn" data-tab="education" id="tab-education">
+            <i class="bi bi-mortarboard me-1"></i> Education
+            <span class="nav-badge ms-1">{{ education|length }}</span>
+        </button>
+        <button class="tab-btn" data-tab="skills" id="tab-skills">
+            <i class="bi bi-code-slash me-1"></i> Skills
+            <span class="nav-badge ms-1">{{ skills|length }}</span>
+        </button>
+        <button class="tab-btn" data-tab="projects" id="tab-projects">
+            <i class="bi bi-boxes me-1"></i> Projects
+            <span class="nav-badge ms-1">{{ projects|length }}</span>
+        </button>
+        <button class="tab-btn" data-tab="experience" id="tab-experience">
+            <i class="bi bi-briefcase me-1"></i> Experience
+            <span class="nav-badge ms-1">{{ experience|length }}</span>
+        </button>
+        <button class="tab-btn" data-tab="certifications" id="tab-certifications">
+            <i class="bi bi-patch-check me-1"></i> Certifications
+            <span class="nav-badge ms-1">{{ certifications|length }}</span>
+        </button>
+        <button class="tab-btn" data-tab="links" id="tab-links">
+            <i class="bi bi-link-45deg me-1"></i> Links
+        </button>
+    </div>
+
+    <!-- ── BASIC INFO TAB ──────────────────────────────────────── -->
+    <div data-tab-panel="profile" data-tab="basic" class="fade-in-up-delay-2" id="section-basic">
+        <div class="card">
+            <div class="card-header">
+                <span class="card-header-title"><i class="bi bi-person-circle text-primary"></i> Basic
+                    Information</span>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('profile.update_basic') }}" method="POST">
+                    <div class="grid-2" style="margin-bottom:var(--space-4);">
+                        <div>
+                            <label class="form-label" for="full_name">Full Name *</label>
+                            <div class="input-icon-wrap">
+                                <i class="bi bi-person"></i>
+                                <input type="text" class="form-control" id="full_name" name="full_name"
+                                    value="{{ user.full_name or '' }}" required placeholder="Enter your full name">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="form-label">Email</label>
+                            <div class="input-icon-wrap">
+                                <i class="bi bi-envelope"></i>
+                                <input type="email" class="form-control" value="{{ user.email }}" disabled
+                                    style="cursor:not-allowed;" title="Email cannot be changed">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="form-label" for="phone">Phone Number</label>
+                            <div class="input-icon-wrap">
+                                <i class="bi bi-telephone"></i>
+                                <input type="tel" class="form-control" id="phone" name="phone"
+                                    value="{{ profile.phone or '' if profile else '' }}" placeholder="Enter your phone number">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="form-label" for="location">Location</label>
+                            <div class="input-icon-wrap">
+                                <i class="bi bi-geo-alt"></i>
+                                <input type="text" class="form-control" id="location" name="location"
+                                    value="{{ profile.location or '' if profile else '' }}"
+                                    placeholder="Enter your location">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="form-label" for="date_of_birth">Date of Birth</label>
+                            <input type="date" class="form-control" id="date_of_birth" name="date_of_birth"
+                                value="{{ profile.date_of_birth or '' if profile else '' }}">
+                        </div>
+                        <div>
+                            <label class="form-label" for="gender">Gender</label>
+                            <select class="form-select" id="gender" name="gender">
+                                <option value="">Select gender</option>
+                                {% for g in ['Male','Female','Non-binary','Prefer not to say'] %}
+                                <option value="{{ g }}" {{ 'selected' if profile and profile.gender==g else '' }}>{{ g
+                                    }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:var(--space-4);">
+                        <label class="form-label" for="career_objective">Career Objective</label>
+                        <textarea class="form-control" id="career_objective" name="career_objective" rows="4"
+                            placeholder="Enter your career objective...">{{ profile.career_objective or '' if profile else '' }}</textarea>
+                        <div class="form-text">This appears on your AI-generated resumes as the professional summary
+                            seed.</div>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end;">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check2"></i> Save & Continue
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── EDUCATION TAB ─────────────────────────────────────────── -->
+    <div data-tab-panel="profile" data-tab="education" style="display:none;" class="fade-in" id="section-education">
+        <!-- Add Education -->
+        <div class="card" style="margin-bottom:var(--space-5);">
+            <div class="card-header">
+                <span class="card-header-title"><i class="bi bi-plus-circle text-primary"></i> Add Education</span>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('profile.add_education') }}" method="POST">
+                    <div class="grid-2" style="margin-bottom:var(--space-4);">
+                        <div>
+                            <label class="form-label">Degree *</label>
+                            <input type="text" class="form-control" name="degree" required
+                                placeholder="Enter your degree">
+                        </div>
+                        <div>
+                            <label class="form-label">Field of Study</label>
+                            <input type="text" class="form-control" name="field_of_study"
+                                placeholder="Enter your field of study">
+                        </div>
+                        <div>
+                            <label class="form-label">Institution / College *</label>
+                            <input type="text" class="form-control" name="institution" required
+                                placeholder="Enter institution / college name">
+                        </div>
+                        <div>
+                            <label class="form-label">University / Board</label>
+                            <input type="text" class="form-control" name="university"
+                                placeholder="Enter university / board">
+                        </div>
+                        <div>
+                            <label class="form-label">Start Year</label>
+                            <input type="number" class="form-control" name="start_year" placeholder="Enter start year" min="1990"
+                                max="2035">
+                        </div>
+                        <div>
+                            <label class="form-label">End Year</label>
+                            <input type="number" class="form-control" name="end_year" placeholder="Enter end year" min="1990"
+                                max="2035">
+                        </div>
+                        <div>
+                            <label class="form-label">CGPA / GPA</label>
+                            <input type="number" class="form-control" name="cgpa" step="0.01" placeholder="Enter your CGPA / GPA" min="0"
+                                max="10">
+                        </div>
+                        <div>
+                            <label class="form-label">Percentage</label>
+                            <input type="number" class="form-control" name="percentage" step="0.1" placeholder="Enter your percentage"
+                                min="0" max="100">
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end;">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="bi bi-check2"></i> Save & Continue
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Existing Education -->
+        {% if education %}
+        <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+            {% for edu in education %}
+            <div class="card">
+                <div class="card-body" style="display:flex; align-items:flex-start; gap:var(--space-4);">
+                    <div
+                        style="width:44px; height:44px; border-radius:var(--radius-md); background:var(--primary-50); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                        <i class="bi bi-mortarboard-fill" style="color:var(--primary); font-size:1.2rem;"></i>
+                    </div>
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-size:var(--text-base); font-weight:700; color:var(--text-1);">{{ edu.degree
+                            }}{% if edu.field_of_study %} in {{ edu.field_of_study }}{% endif %}</div>
+                        <div style="font-size:var(--text-sm); color:var(--text-2); margin-top:2px;">{{ edu.institution
+                            }}{% if edu.university %} — {{ edu.university }}{% endif %}</div>
+                        <div style="display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:var(--space-3);">
+                            {% if edu.start_year or edu.end_year %}
+                            <span class="badge badge-neutral"><i class="bi bi-calendar3"></i> {{ edu.start_year or ''
+                                }}{% if edu.start_year and edu.end_year %} – {% endif %}{{ edu.end_year or '' }}</span>
+                            {% endif %}
+                            {% if edu.cgpa %}<span class="badge badge-success">CGPA: {{ edu.cgpa }}</span>{% endif %}
+                            {% if edu.percentage %}<span class="badge badge-info">{{ edu.percentage }}%</span>{% endif
+                            %}
+                        </div>
+                    </div>
+                    <form action="{{ url_for('profile.delete_education', edu_id=edu.id) }}" method="POST"
+                        onsubmit="return confirm('Delete this education entry?')">
+                        <button type="submit" class="btn btn-icon btn-sm" style="color:var(--danger);" title="Delete">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding:var(--space-8);">
+            <div class="empty-state-icon"><i class="bi bi-mortarboard"></i></div>
+            <div class="empty-state-title">No education added</div>
+            <div class="empty-state-desc">Add your academic qualifications above.</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ── SKILLS TAB ─────────────────────────────────────────────── -->
+    <div data-tab-panel="profile" data-tab="skills" style="display:none;" class="fade-in" id="section-skills">
+        <!-- Add Skill -->
+        <div class="card" style="margin-bottom:var(--space-5);">
+            <div class="card-header">
+                <span class="card-header-title"><i class="bi bi-plus-circle text-primary"></i> Add Skill</span>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('profile.add_skill') }}" method="POST">
+                    <div class="grid-2" style="margin-bottom:var(--space-4);">
+                        <div>
+                            <label class="form-label">Skill Name *</label>
+                            <input type="text" class="form-control" name="skill_name" required
+                                placeholder="Enter skill name">
+                        </div>
+                        <div>
+                            <label class="form-label">Category</label>
+                            <select class="form-select" name="category">
+                                {% for cat in ['Programming','Framework','Database','Cloud','DevOps','Tool','Soft
+                                Skill','Other'] %}
+                                <option value="{{ cat }}">{{ cat }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label">Proficiency Level</label>
+                            <select class="form-select" name="proficiency" id="proficiencySelect"
+                                onchange="updatePct(this.value)">
+                                <option value="Beginner">Beginner (25%)</option>
+                                <option value="Intermediate" selected>Intermediate (50%)</option>
+                                <option value="Advanced">Advanced (75%)</option>
+                                <option value="Expert">Expert (90%)</option>
+                            </select>
+                            <input type="hidden" name="proficiency_percent" id="proficiencyPct" value="50">
+                        </div>
+                        <div style="display:flex; align-items:flex-end;">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-check2"></i> Save & Continue
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Skills Grid -->
+        {% if skills %}
+        {% set categories = skills | groupby('category') %}
+        {% for cat, cat_skills in categories %}
+        <div class="card" style="margin-bottom:var(--space-4);">
+            <div class="card-header" style="padding:var(--space-3) var(--space-5);">
+                <span class="card-header-title" style="font-size:var(--text-sm);">
+                    <i class="bi bi-tag text-primary"></i> {{ cat }}
+                </span>
+                <span class="badge badge-neutral">{{ cat_skills|list|length }}</span>
+            </div>
+            <div class="card-body" style="display:flex; flex-wrap:wrap; gap:var(--space-2);">
+                {% for skill in cat_skills %}
+                <div class="skill-chip" style="gap:var(--space-2); padding:0.35em 0.75em;">
+                    {{ skill.skill_name }}
+                    <span class="badge badge-neutral" style="font-size:0.65rem; margin-left:2px; padding:2px 6px;">{{
+                        skill.proficiency }}</span>
+                    <form action="{{ url_for('profile.delete_skill', skill_id=skill.id) }}" method="POST"
+                        style="display:inline;">
+                        <button type="submit" class="remove-btn" title="Remove"
+                            style="background:none; border:none; cursor:pointer; padding:0; display:flex; align-items:center;">
+                            <i class="bi bi-x" style="font-size:0.9rem; color:var(--text-3);"></i>
+                        </button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state" style="padding:var(--space-8);">
+            <div class="empty-state-icon"><i class="bi bi-code-slash"></i></div>
+            <div class="empty-state-title">No skills added</div>
+            <div class="empty-state-desc">Add your technical and soft skills above. They are used by AI to generate
+                better resumes.</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ── PROJECTS TAB ───────────────────────────────────────────── -->
+    <div data-tab-panel="profile" data-tab="projects" style="display:none;" class="fade-in" id="section-projects">
+        <!-- Add Project -->
+        <div class="card" style="margin-bottom:var(--space-5);">
+            <div class="card-header">
+                <span class="card-header-title"><i class="bi bi-plus-circle text-primary"></i> Add Project</span>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('profile.add_project') }}" method="POST">
+                    <div style="margin-bottom:var(--space-4);">
+                        <label class="form-label">Project Title *</label>
+                        <input type="text" class="form-control" name="title" required
+                            placeholder="Enter project title">
+                    </div>
+                    <div class="grid-2" style="margin-bottom:var(--space-4);">
+                        <div>
+                            <label class="form-label">Technologies Used</label>
+                            <input type="text" class="form-control" name="technologies"
+                                placeholder="Enter technologies used">
+                        </div>
+                        <div>
+                            <label class="form-label">GitHub URL</label>
+                            <div class="input-icon-wrap">
+                                <i class="bi bi-github"></i>
+                                <input type="url" class="form-control" name="github_url"
+                                    placeholder="Enter GitHub URL">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="form-label">Live / Demo URL</label>
+                            <div class="input-icon-wrap">
+                                <i class="bi bi-globe2"></i>
+                                <input type="url" class="form-control" name="live_url"
+                                    placeholder="Enter Live / Demo URL">
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:var(--space-4);">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="3"
+                            placeholder="Enter project description..."></textarea>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end;">
+                        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check2"></i> Save &
+                            Continue</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Project Cards -->
+        {% if projects %}
+        <div class="grid-2">
+            {% for proj in projects %}
+            <div class="card card-hover">
+                <div class="card-body">
+                    <div
+                        style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:var(--space-3);">
+                        <div style="font-size:var(--text-base); font-weight:700;">{{ proj.title }}</div>
+                        <form action="{{ url_for('profile.delete_project', proj_id=proj.id) }}" method="POST"
+                            onsubmit="return confirm('Delete this project?')">
+                            <button type="submit" class="btn btn-icon btn-sm" style="color:var(--danger);">
+                                <i class="bi bi-trash3"></i>
+                            </button>
+                        </form>
+                    </div>
+                    {% if proj.description %}
+                    <p
+                        style="font-size:var(--text-sm); color:var(--text-2); margin-bottom:var(--space-3); line-height:1.6;">
+                        {{ proj.description[:120] }}{% if proj.description|length > 120 %}…{% endif %}</p>
+                    {% endif %}
+                    {% if proj.technologies %}
+                    <div style="display:flex; flex-wrap:wrap; gap:var(--space-1); margin-bottom:var(--space-3);">
+                        {% for tech in proj.technologies.split(',') %}
+                        <span class="badge badge-primary">{{ tech.strip() }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <div style="display:flex; gap:var(--space-3);">
+                        {% if proj.github_url %}
+                        <a href="{{ proj.github_url }}" target="_blank" class="btn btn-ghost btn-sm">
+                            <i class="bi bi-github"></i> GitHub
+                        </a>
+                        {% endif %}
+                        {% if proj.live_url %}
+                        <a href="{{ proj.live_url }}" target="_blank" class="btn btn-ghost btn-sm">
+                            <i class="bi bi-globe2"></i> Live
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding:var(--space-8);">
+            <div class="empty-state-icon"><i class="bi bi-boxes"></i></div>
+            <div class="empty-state-title">No projects yet</div>
+            <div class="empty-state-desc">Add projects to showcase your practical experience.</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ── EXPERIENCE TAB ─────────────────────────────────────────── -->
+    <div data-tab-panel="profile" data-tab="experience" style="display:none;" class="fade-in" id="section-experience">
+        <div class="card" style="margin-bottom:var(--space-5);">
+            <div class="card-header">
+                <span class="card-header-title"><i class="bi bi-plus-circle text-primary"></i> Add Experience</span>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('profile.add_experience') }}" method="POST">
+                    <div class="grid-2" style="margin-bottom:var(--space-4);">
+                        <div>
+                            <label class="form-label">Job Title *</label>
+                            <input type="text" class="form-control" name="job_title" required
+                                placeholder="Enter job title">
+                        </div>
+                        <div>
+                            <label class="form-label">Company Name *</label>
+                            <input type="text" class="form-control" name="company_name" required
+                                placeholder="Enter company name">
+                        </div>
+                        <div>
+                            <label class="form-label">Location</label>
+                            <input type="text" class="form-control" name="location" placeholder="Enter location">
+                        </div>
+                        <div></div>
+                        <div>
+                            <label class="form-label">Start Date</label>
+                            <input type="date" class="form-control" name="start_date">
+                        </div>
+                        <div>
+                            <label class="form-label">End Date</label>
+                            <input type="date" class="form-control" name="end_date">
+                            <div class="form-text">Leave blank if currently working here.</div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:var(--space-4);">
+                        <label class="form-label">Description / Responsibilities</label>
+                        <textarea class="form-control" name="description" rows="3"
+                            placeholder="Enter key responsibilities and achievements..."></textarea>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end;">
+                        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check2"></i> Save &
+                            Continue</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if experience %}
+        <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+            {% for exp in experience %}
+            <div class="card">
+                <div class="card-body" style="display:flex; align-items:flex-start; gap:var(--space-4);">
+                    <div
+                        style="width:44px; height:44px; border-radius:var(--radius-md); background:var(--secondary-50); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                        <i class="bi bi-briefcase-fill" style="color:var(--secondary); font-size:1.1rem;"></i>
+                    </div>
+                    <div style="flex:1;">
+                        <div style="font-size:var(--text-base); font-weight:700;">{{ exp.job_title }}</div>
+                        <div style="font-size:var(--text-sm); color:var(--text-2);">{{ exp.company_name }}{% if
+                            exp.location %} &bull; {{ exp.location }}{% endif %}</div>
+                        <div style="margin-top:var(--space-2);">
+                            <span class="badge badge-neutral"><i class="bi bi-calendar3"></i>
+                                {{ exp.start_date.strftime('%b %Y') if exp.start_date else '' }} –
+                                {{ exp.end_date.strftime('%b %Y') if exp.end_date else 'Present' }}
+                            </span>
+                        </div>
+                        {% if exp.description %}
+                        <p style="font-size:var(--text-sm); color:var(--text-2); margin-top:var(--space-2);">{{
+                            exp.description[:150] }}{% if exp.description|length > 150 %}…{% endif %}</p>
+                        {% endif %}
+                    </div>
+                    <form action="{{ url_for('profile.delete_experience', exp_id=exp.id) }}" method="POST"
+                        onsubmit="return confirm('Delete this experience?')">
+                        <button type="submit" class="btn btn-icon btn-sm" style="color:var(--danger);">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding:var(--space-8);">
+            <div class="empty-state-icon"><i class="bi bi-briefcase"></i></div>
+            <div class="empty-state-title">No experience added</div>
+            <div class="empty-state-desc">Add internships, part-time or full-time work experience.</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ── CERTIFICATIONS TAB ─────────────────────────────────────── -->
+    <div data-tab-panel="profile" data-tab="certifications" style="display:none;" class="fade-in"
+        id="section-certifications">
+        <div class="card" style="margin-bottom:var(--space-5);">
+            <div class="card-header">
+                <span class="card-header-title"><i class="bi bi-plus-circle text-primary"></i> Add Certification</span>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('profile.add_certification') }}" method="POST">
+                    <div class="grid-2" style="margin-bottom:var(--space-4);">
+                        <div>
+                            <label class="form-label">Certification Name *</label>
+                            <input type="text" class="form-control" name="cert_name" required
+                                placeholder="Enter certification name">
+                        </div>
+                        <div>
+                            <label class="form-label">Issuing Organization</label>
+                            <input type="text" class="form-control" name="issuing_org"
+                                placeholder="Enter issuing organization">
+                        </div>
+                        <div>
+                            <label class="form-label">Issue Date</label>
+                            <input type="date" class="form-control" name="issue_date">
+                        </div>
+                        <div>
+                            <label class="form-label">Expiry Date</label>
+                            <input type="date" class="form-control" name="expiry_date">
+                        </div>
+                        <div>
+                            <label class="form-label">Credential ID</label>
+                            <input type="text" class="form-control" name="credential_id" placeholder="Enter credential ID">
+                        </div>
+                        <div>
+                            <label class="form-label">Credential URL</label>
+                            <input type="url" class="form-control" name="credential_url" placeholder="Enter credential URL">
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end;">
+                        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check2"></i> Save &
+                            Continue</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if certifications %}
+        <div class="grid-2">
+            {% for cert in certifications %}
+            <div class="card">
+                <div class="card-body" style="display:flex; align-items:flex-start; gap:var(--space-3);">
+                    <div
+                        style="width:40px; height:40px; border-radius:var(--radius-md); background:var(--success-100); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                        <i class="bi bi-patch-check-fill" style="color:var(--success); font-size:1.1rem;"></i>
+                    </div>
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-size:var(--text-sm); font-weight:700; color:var(--text-1);">{{ cert.cert_name
+                            }}</div>
+                        {% if cert.issuing_org %}
+                        <div style="font-size:var(--text-xs); color:var(--text-3);">{{ cert.issuing_org }}</div>
+                        {% endif %}
+                        {% if cert.issue_date %}
+                        <span class="badge badge-neutral" style="margin-top:var(--space-2);">{{
+                            cert.issue_date.strftime('%b %Y') if cert.issue_date else '' }}</span>
+                        {% endif %}
+                        {% if cert.credential_url %}
+                        <div style="margin-top:var(--space-2);">
+                            <a href="{{ cert.credential_url }}" target="_blank" class="btn btn-ghost btn-sm"
+                                style="padding:0.2rem 0.5rem;">
+                                <i class="bi bi-box-arrow-up-right"></i> Verify
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <form action="{{ url_for('profile.delete_certification', cert_id=cert.id) }}" method="POST"
+                        onsubmit="return confirm('Delete this certification?')">
+                        <button type="submit" class="btn btn-icon btn-sm" style="color:var(--danger);">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding:var(--space-8);">
+            <div class="empty-state-icon"><i class="bi bi-patch-check"></i></div>
+            <div class="empty-state-title">No certifications</div>
+            <div class="empty-state-desc">Add professional certifications to boost your resume score.</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ── LINKS TAB ─────────────────────────────────────────────── -->
+    <div data-tab-panel="profile" data-tab="links" style="display:none;" class="fade-in" id="section-links">
+        <div class="card">
+            <div class="card-header">
+                <span class="card-header-title"><i class="bi bi-link-45deg text-primary"></i> Social & Portfolio
+                    Links</span>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('profile.update_links') }}" method="POST">
+                    <div style="display:flex; flex-direction:column; gap:var(--space-4); margin-bottom:var(--space-5);">
+                        <div>
+                            <label class="form-label"><i class="bi bi-linkedin me-1" style="color:#0077B5;"></i>
+                                LinkedIn Profile URL</label>
+                            <div class="input-icon-wrap">
+                                <i class="bi bi-linkedin" style="color:#0077B5;"></i>
+                                <input type="url" class="form-control" name="linkedin_url"
+                                    value="{{ profile.linkedin_url or '' if profile else '' }}"
+                                    placeholder="Enter LinkedIn profile URL">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="form-label"><i class="bi bi-github me-1"></i> GitHub Profile URL</label>
+                            <div class="input-icon-wrap">
+                                <i class="bi bi-github"></i>
+                                <input type="url" class="form-control" name="github_url"
+                                    value="{{ profile.github_url or '' if profile else '' }}"
+                                    placeholder="Enter GitHub profile URL">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="form-label"><i class="bi bi-globe2 me-1" style="color:var(--accent);"></i>
+                                Portfolio Website URL</label>
+                            <div class="input-icon-wrap">
+                                <i class="bi bi-globe2" style="color:var(--accent);"></i>
+                                <input type="url" class="form-control" name="portfolio_url"
+                                    value="{{ profile.portfolio_url or '' if profile else '' }}"
+                                    placeholder="Enter portfolio URL">
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end;">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check2"></i> Save & Continue
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+</div><!-- stagger-children -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function updatePct(val) {
+        const map = { Beginner: 25, Intermediate: 50, Advanced: 75, Expert: 90 };
+        document.getElementById('proficiencyPct').value = map[val] || 50;
+    }
+
+    // Handle hash routing for direct section linking
+    document.addEventListener('DOMContentLoaded', () => {
+        const hash = window.location.hash.replace('#', '');
+        const tabMap = {
+            basic: 'tab-basic', education: 'tab-education', skills: 'tab-skills',
+            projects: 'tab-projects', experience: 'tab-experience',
+            certifications: 'tab-certifications', links: 'tab-links'
+        };
+        if (hash && tabMap[hash]) {
+            document.getElementById(tabMap[hash])?.click();
+        }
+    });
+</script>
+{% endblock %}

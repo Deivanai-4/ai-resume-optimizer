@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+{% block title %}AI Analysis — AI Career Intelligence Platform{% endblock %}
+{% block page_title %}AI Analysis{% endblock %}
+
+{% block content %}
+<div class="stagger-children fade-in-up" style="max-width: 1200px; margin: 0 auto; min-height: 80vh;">
+
+{% if not selected_analysis %}
+<!-- ── EMPTY STATE / FORM (Centered like a search engine) ───────────────────────── -->
+<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height: 70vh; padding: 2rem;">
+    
+    <div style="text-align:center; margin-bottom: 3rem; animation: float 6s ease-in-out infinite;">
+        <div style="display:inline-flex; align-items:center; justify-content:center; width:80px; height:80px; border-radius:24px; background:linear-gradient(135deg, var(--primary), var(--secondary)); color:white; font-size:2.5rem; box-shadow:0 15px 35px rgba(79, 70, 229, 0.4); margin-bottom:1.5rem;">
+            <i class="bi bi-robot"></i>
+        </div>
+        <h1 style="font-size:2.5rem; font-weight:900; color:var(--text-1); letter-spacing:-0.5px;">AI Resume Analysis</h1>
+        <p style="color:var(--text-2); font-size:1.1rem; max-width:500px; margin:1rem auto 0; line-height:1.6;">
+            Discover your exact ATS score, identify missing skills, and get personalized actionable feedback.
+        </p>
+    </div>
+
+    <!-- The Form Card -->
+    <div class="card" style="width:100%; max-width:800px; border:none; border-radius:24px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.1); background:var(--surface-1); overflow:hidden;">
+        <div class="card-body" style="padding: 2.5rem;">
+            <form action="{{ url_for('analysis.run_analysis') }}" method="POST" id="analysisForm">
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+                    
+                    <!-- Resume -->
+                    <div>
+                        <label style="font-size:0.85rem; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; display:block;">1. Select Resume *</label>
+                        <select name="resume_id" id="resumeSelect" required style="width:100%; padding:14px 16px; background:var(--surface-2); border:2px solid transparent; border-radius:12px; color:var(--text-1); outline:none; font-size:1rem; transition:border 0.2s;" onfocus="this.style.borderColor='var(--primary)';">
+                            <option value="">— Choose a resume —</option>
+                            {% for r in resumes %}
+                            <option value="{{ r.id }}" {{ 'selected' if preselect_resume == r.id else '' }}>
+                                {{ r.original_name }} {% if r.is_parsed %}✓{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        {% if not resumes %}
+                        <div style="color:var(--warning); font-size:0.85rem; margin-top:8px; font-weight:600;">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <a href="{{ url_for('resumes.index') }}" style="color:var(--warning); text-decoration:underline;">Upload a resume</a> first.
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Company -->
+                    <div>
+                        <label style="font-size:0.85rem; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; display:block;">2. Target Company</label>
+                        <select name="company_id" id="companySelect" onchange="handleCompanyChange(this)" style="width:100%; padding:14px 16px; background:var(--surface-2); border:2px solid transparent; border-radius:12px; color:var(--text-1); outline:none; font-size:1rem; transition:border 0.2s;" onfocus="this.style.borderColor='var(--primary)';">
+                            <option value="">— General (no company) —</option>
+                            {% for c in companies %}
+                            <option value="{{ c.id }}" {{ 'selected' if preselect_company == c.id else '' }}>{{ c.name }}</option>
+                            {% endfor %}
+                            <option value="manual">✏️ Enter manually…</option>
+                        </select>
+                    </div>
+
+                    <!-- Manual company name -->
+                    <div id="manualCompanyWrap" style="display:none; grid-column: 1 / -1;">
+                        <label style="font-size:0.85rem; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; display:block;">Company Name (Manual)</label>
+                        <input type="text" name="company_manual" placeholder="E.g. Infosys, TCS…" style="width:100%; padding:14px 16px; background:var(--surface-2); border:2px solid transparent; border-radius:12px; color:var(--text-1); outline:none; font-size:1rem; transition:border 0.2s;" onfocus="this.style.borderColor='var(--primary)';">
+                    </div>
+
+                    <!-- Job Title -->
+                    <div style="grid-column: 1 / -1;">
+                        <label style="font-size:0.85rem; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; display:block;">3. Job Title</label>
+                        <input type="text" name="job_title" placeholder="Software Engineer" value="Software Engineer" style="width:100%; padding:14px 16px; background:var(--surface-2); border:2px solid transparent; border-radius:12px; color:var(--text-1); outline:none; font-size:1rem; transition:border 0.2s;" onfocus="this.style.borderColor='var(--primary)';">
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <div style="margin-top: 2rem; text-align:center;">
+                    <button type="submit" id="runBtn" class="btn btn-gradient" style="padding:16px 48px; border-radius:50px; font-weight:800; font-size:1.15rem; box-shadow:0 10px 25px rgba(79, 70, 229, 0.4); transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-3px)';" onmouseout="this.style.transform='translateY(0)';" {% if not resumes %}disabled{% endif %}>
+                        <i class="bi bi-stars me-2"></i> Analyze My Resume
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Recent Analyses (Below Form) -->
+    {% if recent_analyses %}
+    <div style="margin-top:4rem; width:100%; max-width:800px;">
+        <h4 style="font-size:1rem; font-weight:800; color:var(--text-3); text-transform:uppercase; letter-spacing:1px; margin-bottom:1.5rem; text-align:center;">Recent Analysis Reports</h4>
+        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap:1rem;">
+            {% for a in recent_analyses[:3] %}
+            <a href="{{ url_for('analysis.index', analysis_id=a.id) }}" 
+               class="card" style="border:none; border-radius:16px; text-decoration:none; transition:all 0.2s; box-shadow:0 4px 15px rgba(0,0,0,0.03); display:flex; flex-direction:row; align-items:center; padding:16px; gap:16px; background:var(--surface-1);"
+               onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(0,0,0,0.08)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(0,0,0,0.03)';">
+                
+                <div data-ring="{{ a.overall_score }}" data-ring-size="50" data-ring-color="{{ 'var(--success)' if a.overall_score >= 70 else 'var(--warning)' if a.overall_score >= 40 else 'var(--danger)' }}"></div>
+                
+                <div style="flex:1; min-width:0;">
+                    <div style="font-weight:800; color:var(--text-1); font-size:1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                        {{ a.company_name or a.job_title or 'General' }}
+                    </div>
+                    <div style="font-size:0.8rem; color:var(--text-3); font-weight:600;">
+                        <i class="bi bi-clock"></i> {{ a.created_at.strftime('%d %b, %Y') if a.created_at else '' }}
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% else %}
+<!-- ── FULL PAGE REPORT STATE ────────────────────────────────────────────── -->
+{% set a = selected_analysis %}
+
+<!-- Report Header -->
+<div style="display:flex; flex-wrap:wrap; gap:1.5rem; align-items:center; justify-content:space-between; margin-bottom: 2rem; background: var(--surface-1); padding: 1.5rem 2rem; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.03);">
+    <div style="display:flex; align-items:center; gap: 1.5rem;">
+        <a href="{{ url_for('analysis.index') }}" class="btn btn-sm btn-light" style="border-radius:12px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 5px rgba(0,0,0,0.05);" title="New Analysis">
+            <i class="bi bi-arrow-left" style="font-size:1.2rem;"></i>
+        </a>
+        <div>
+            <div style="font-size:0.8rem; font-weight:800; color:var(--primary); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Diagnostic Report</div>
+            <h2 style="font-size:1.8rem; font-weight:900; color:var(--text-1); margin:0; line-height:1.2;">
+                {{ a.job_title or 'Resume Analysis' }}
+                {% if a.company_name %}<span style="color:var(--text-3); font-weight:400;"> @ {{ a.company_name }}</span>{% endif %}
+            </h2>
+        </div>
+    </div>
+    <div style="display:flex; align-items:center; gap: 1rem;">
+        <div style="text-align:right; margin-right:10px;">
+            <div style="font-size:0.85rem; font-weight:700; color:var(--text-3);">Overall Match</div>
+            <div style="font-size:1.5rem; font-weight:900; color:{{ 'var(--success)' if a.overall_score >= 80 else 'var(--primary)' if a.overall_score >= 60 else 'var(--warning)' if a.overall_score >= 40 else 'var(--danger)' }};">{{ a.overall_score }}%</div>
+        </div>
+        <a href="{{ url_for('optimize.index') }}" class="btn btn-gradient" style="border-radius:12px; font-weight:700; padding:10px 20px;">
+            <i class="bi bi-magic me-1"></i> Tailor Resume
+        </a>
+    </div>
+</div>
+
+<!-- Main Report Grid -->
+<div style="display:grid; grid-template-columns: 1fr 350px; gap: 2rem; align-items: start;">
+    
+    <!-- Left Column (Main Insights) -->
+    <div style="display:flex; flex-direction:column; gap: 2rem;">
+        
+        <!-- Metrics Breakdown -->
+        <div class="card" style="border:none; border-radius:24px; box-shadow:0 10px 30px rgba(0,0,0,0.03); background:var(--surface-1); overflow:hidden;">
+            <div style="padding: 2rem; border-bottom: 1px solid var(--border);">
+                <h3 style="font-size:1.25rem; font-weight:800; color:var(--text-1); margin:0; display:flex; align-items:center; gap:10px;">
+                    <div style="width:36px; height:36px; border-radius:10px; background:var(--primary-100); color:var(--primary-700); display:flex; align-items:center; justify-content:center;"><i class="bi bi-bar-chart-fill"></i></div>
+                    Performance Metrics
+                </h3>
+            </div>
+            <div class="card-body" style="padding: 2rem; display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
+                {% set scores = [
+                    ('ATS Compatibility', a.ats_score, 'bi-robot', 'var(--primary)'),
+                    ('Skill Alignment', a.skill_match_score, 'bi-code-slash', 'var(--success)'),
+                    ('Tech Stack Match', a.tech_match_score, 'bi-cpu', 'var(--info)'),
+                    ('Career Readiness', a.career_readiness_score, 'bi-briefcase', 'var(--warning)'),
+                    ('Interview Ready', a.interview_readiness_score, 'bi-chat-dots', 'var(--primary)'),
+                    ('Format & Grammar', ((a.grammar_score or 0) + (a.formatting_score or 0)) // 2, 'bi-layout-text-window', 'var(--danger)')
+                ] %}
+                {% for label, score, icon, color in scores %}
+                <div>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                        <div style="width:32px; height:32px; border-radius:50%; background:{{ color }}20; color:{{ color }}; display:flex; align-items:center; justify-content:center;"><i class="bi {{ icon }}"></i></div>
+                        <span style="color:var(--text-1); font-weight:700; font-size:0.95rem;">{{ label }}</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <div style="flex:1; height:10px; background:var(--surface-2); border-radius:5px; overflow:hidden;">
+                            <div style="height:100%; width:{{ score or 0 }}%; background:{{ color }}; border-radius:5px; transition:width 1s ease-in-out;"></div>
+                        </div>
+                        <span style="color:var(--text-1); font-weight:800; font-size:1.1rem; width:45px; text-align:right;">{{ score or 0 }}%</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Feedback Split (Strengths / Weaknesses) -->
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+            <!-- Strengths -->
+            <div class="card" style="border:none; border-radius:24px; box-shadow:0 10px 30px rgba(0,0,0,0.03); background:var(--surface-1); height:100%;">
+                <div style="padding: 1.5rem 1.5rem 1rem; border-bottom: 1px solid var(--border);">
+                    <h3 style="font-size:1.1rem; font-weight:800; color:var(--success-700); margin:0; display:flex; align-items:center; gap:10px;">
+                        <i class="bi bi-patch-check-fill" style="font-size:1.4rem;"></i> Key Strengths
+                    </h3>
+                </div>
+                <div class="card-body" style="padding: 1.5rem;">
+                    <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:1rem;">
+                        {% for s in a.strengths_list %}
+                        <li style="display:flex; align-items:flex-start; gap:12px;">
+                            <i class="bi bi-check-circle-fill text-success" style="margin-top:2px;"></i>
+                            <span style="color:var(--text-1); font-size:0.95rem; line-height:1.6;">{{ s }}</span>
+                        </li>
+                        {% else %}
+                        <li class="text-muted">No specific strengths identified.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            <!-- Weaknesses -->
+            <div class="card" style="border:none; border-radius:24px; box-shadow:0 10px 30px rgba(0,0,0,0.03); background:var(--surface-1); height:100%;">
+                <div style="padding: 1.5rem 1.5rem 1rem; border-bottom: 1px solid var(--border);">
+                    <h3 style="font-size:1.1rem; font-weight:800; color:var(--danger-700); margin:0; display:flex; align-items:center; gap:10px;">
+                        <i class="bi bi-exclamation-square-fill" style="font-size:1.4rem;"></i> Areas for Growth
+                    </h3>
+                </div>
+                <div class="card-body" style="padding: 1.5rem;">
+                    <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:1rem;">
+                        {% for w in a.weaknesses_list %}
+                        <li style="display:flex; align-items:flex-start; gap:12px;">
+                            <i class="bi bi-x-circle-fill text-danger" style="margin-top:2px;"></i>
+                            <span style="color:var(--text-1); font-size:0.95rem; line-height:1.6;">{{ w }}</span>
+                        </li>
+                        {% else %}
+                        <li class="text-muted">No critical weaknesses found.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Suggestions -->
+        <div class="card" style="border:none; border-radius:24px; box-shadow:0 10px 30px rgba(0,0,0,0.03); background:linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);">
+            <div style="padding: 2rem;">
+                <h3 style="font-size:1.25rem; font-weight:800; color:#0369a1; margin:0 0 1.5rem; display:flex; align-items:center; gap:10px;">
+                    <div style="width:36px; height:36px; border-radius:10px; background:#0284c7; color:white; display:flex; align-items:center; justify-content:center;"><i class="bi bi-lightbulb-fill"></i></div>
+                    AI Recommendations
+                </h3>
+                <div style="display:flex; flex-direction:column; gap:1rem;">
+                    {% for sug in a.suggestions_list %}
+                    <div style="background:rgba(255,255,255,0.7); border:1px solid rgba(255,255,255,0.9); border-radius:16px; padding:16px 20px; display:flex; align-items:center; gap:16px; box-shadow:0 2px 10px rgba(0,0,0,0.02);">
+                        <i class="bi bi-stars" style="color:#0284c7; font-size:1.5rem;"></i>
+                        <span style="color:#0f172a; font-size:1rem; font-weight:500; line-height:1.5;">{{ sug }}</span>
+                    </div>
+                    {% else %}
+                    <div class="text-muted">No suggestions at this time.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Right Column (Radar & Skills) -->
+    <div style="display:flex; flex-direction:column; gap: 2rem;">
+        
+        <!-- Radar Card -->
+        <div class="card" style="border:none; border-radius:24px; box-shadow:0 10px 30px rgba(0,0,0,0.03); background:var(--surface-1);">
+            <div style="padding: 1.5rem; text-align:center;">
+                <h4 style="font-size:1rem; font-weight:800; color:var(--text-1); margin-bottom:1rem; text-transform:uppercase; letter-spacing:1px;">Skill Map</h4>
+                <div style="position:relative; height:280px; width:100%; display:flex; align-items:center; justify-content:center;">
+                    <canvas id="analysisRadar" aria-label="Score radar chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Missing Skills -->
+        <div class="card" style="border:none; border-radius:24px; box-shadow:0 10px 30px rgba(0,0,0,0.03); background:var(--surface-1);">
+            <div style="padding: 1.5rem 1.5rem 1rem; border-bottom: 1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <h3 style="font-size:1rem; font-weight:800; color:var(--warning-700); margin:0; display:flex; align-items:center; gap:10px; text-transform:uppercase; letter-spacing:1px;">
+                    <i class="bi bi-dash-circle-dotted"></i> Missing Skills
+                </h3>
+                {% if a.missing_skills_list %}
+                <form action="{{ url_for('roadmap.generate') }}" method="POST" id="generateRoadmapForm" style="margin:0;">
+                    <input type="hidden" name="job_title" value="{{ a.job_title }}">
+                    <input type="hidden" name="company_name" value="{{ a.company_name or '' }}">
+                    <input type="hidden" name="skills" value="{{ ', '.join(a.missing_skills_list) }}">
+                    <button type="submit" class="btn btn-sm btn-warning" style="font-weight:700; border-radius:30px; padding:0.4rem 1rem; box-shadow:0 4px 10px rgba(245,158,11,0.2);">
+                        <i class="bi bi-map me-1"></i> Generate Roadmap
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+            <div class="card-body" style="padding: 1.5rem;">
+                {% if a.missing_skills_list %}
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    {% for sk in a.missing_skills_list %}
+                    <span style="padding:8px 14px; background:var(--warning-50); color:var(--warning-700); border:1px solid var(--warning-200); border-radius:12px; font-size:0.9rem; font-weight:600;">{{ sk }}</span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-muted text-sm">No critical missing skills.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Keywords -->
+        {% if a.keywords_list %}
+        <div class="card" style="border:none; border-radius:24px; box-shadow:0 10px 30px rgba(0,0,0,0.03); background:var(--surface-1);">
+            <div style="padding: 1.5rem 1.5rem 1rem; border-bottom: 1px solid var(--border);">
+                <h3 style="font-size:1rem; font-weight:800; color:var(--primary-700); margin:0; display:flex; align-items:center; gap:10px; text-transform:uppercase; letter-spacing:1px;">
+                    <i class="bi bi-check2-all"></i> Matched Keywords
+                </h3>
+            </div>
+            <div class="card-body" style="padding: 1.5rem;">
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    {% for kw in a.keywords_list %}
+                    <span style="padding:6px 12px; background:var(--surface-2); color:var(--text-1); border-radius:8px; font-size:0.85rem; font-weight:600;">{{ kw }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+{% endif %}
+</div><!-- stagger-children -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+function handleCompanyChange(sel) {
+    document.getElementById('manualCompanyWrap').style.display = sel.value === 'manual' ? 'block' : 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Attach AI loading to form if exists
+    const form = document.getElementById('analysisForm');
+    if (form) {
+        attachAIFormLoading('analysisForm', [
+            'Parsing your resume structure…',
+            'Comparing against target job requirements…',
+            'Calculating ATS compatibility score…',
+            'Identifying missing skills and keywords…',
+            'Formulating actionable insights…',
+            'Generating final diagnostic report…'
+        ]);
+    }
+    
+    // Attach AI loading for roadmap generation
+    const rForm = document.getElementById('generateRoadmapForm');
+    if (rForm) {
+        attachAIFormLoading('generateRoadmapForm', [
+            'Analyzing missing skills…',
+            'Structuring step-by-step learning path…',
+            'Sourcing high-quality tutorials and docs…',
+            'Estimating time requirements…',
+            'Building customized project ideas…',
+            'Finalizing your roadmap…'
+        ]);
+    }
+
+    // Radar Chart
+    const ctx = document.getElementById('analysisRadar');
+    if (ctx) {
+        {% if selected_analysis %}
+        new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['ATS','Skill','Tech','Career','Interview','Grammar','Format'],
+                datasets: [{
+                    label: 'Score',
+                    data: [
+                        {{ selected_analysis.ats_score or 0 }},
+                        {{ selected_analysis.skill_match_score or 0 }},
+                        {{ selected_analysis.tech_match_score or 0 }},
+                        {{ selected_analysis.career_readiness_score or 0 }},
+                        {{ selected_analysis.interview_readiness_score or 0 }},
+                        {{ selected_analysis.grammar_score or 0 }},
+                        {{ selected_analysis.formatting_score or 0 }}
+                    ],
+                    fill: true,
+                    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                    borderColor: '#6366f1',
+                    pointBackgroundColor: '#4f46e5',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: '#4f46e5',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        min: 0, max: 100,
+                        ticks: { stepSize: 25, display: false },
+                        grid: { color: 'rgba(0,0,0,0.08)' },
+                        angleLines: { color: 'rgba(0,0,0,0.08)' },
+                        pointLabels: { font: { size: 10, weight: '700', family: "'Inter', sans-serif" }, color: '#4b5563' }
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+        {% endif %}
+    }
+});
+</script>
+<style>
+    @keyframes float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+        100% { transform: translateY(0px); }
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — AI Career Intelligence Platform{% endblock %}
+{% block meta_description %}Your AI-powered career readiness dashboard. Monitor ATS scores, skill gaps, analyses, and career progress.{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="stagger-children">
+
+<!-- ── WELCOME HEADER ──────────────────────────────────────── -->
+<div class="fade-in-up" style="margin-bottom: var(--space-6);">
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-4); flex-wrap:wrap;">
+        <div>
+            <h1 style="font-size:var(--text-2xl); font-weight:800; color:var(--text-1); margin-bottom:var(--space-1);">
+                Welcome back, {{ (current_user_name or 'there').split()[0] }}! 👋
+            </h1>
+            <p style="color:var(--text-3); font-size:var(--text-sm); margin:0;">
+                Your personalized career readiness overview &mdash; {{ now.strftime('%A, %d %B %Y') if now is defined else 'Today' }}
+            </p>
+        </div>
+        <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+            <a href="{{ url_for('resume_builder.create') }}" class="btn btn-gradient">
+                <i class="bi bi-stars"></i> Create AI Resume
+            </a>
+            <a href="{{ url_for('analysis.index') }}" class="btn btn-secondary">
+                <i class="bi bi-graph-up-arrow"></i> Run Analysis
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- ── PROFILE COMPLETION CTA ─────────────────────────────── -->
+{% if profile_completion < 80 %}
+<div class="cta-banner fade-in-up-delay-1" style="margin-bottom:var(--space-6);">
+    <div>
+        <div class="cta-banner-title">⚡ Complete your profile to unlock full AI potential</div>
+        <div class="cta-banner-sub">Your profile is {{ profile_completion }}% complete. A complete profile generates better resumes and more accurate analyses.</div>
+    </div>
+    <a href="{{ url_for('profile.index') }}" class="btn" style="background:white; color:var(--primary); font-weight:700;">
+        <i class="bi bi-person-fill-gear"></i> Complete Profile
+    </a>
+</div>
+{% endif %}
+
+<!-- ── STAT CARDS ──────────────────────────────────────────── -->
+<div class="stat-row fade-in-up-delay-1" style="margin-bottom:var(--space-6); display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-4);">
+
+    <!-- Profile Completion -->
+    <a href="{{ url_for('profile.index') }}" class="stat-card" style="text-decoration:none; cursor:pointer; transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='var(--shadow-lg)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between;">
+            <div>
+                <div class="stat-card-label">Profile Completion</div>
+                <div class="stat-card-value" data-count-to="{{ profile_completion }}" data-count-suffix="%">0%</div>
+                <div class="stat-card-trend {{ 'up' if profile_completion >= 80 else 'neutral' if profile_completion >= 50 else 'down' }}">
+                    <i class="bi bi-{{ 'check-circle-fill' if profile_completion >= 80 else 'pencil-fill' if profile_completion >= 50 else 'exclamation-circle-fill' }}"></i>
+                    {{ 'Complete!' if profile_completion >= 80 else 'In Progress' if profile_completion >= 50 else 'Needs Attention' }}
+                </div>
+            </div>
+            <div class="stat-card-icon" style="background:var(--primary-50);">
+                <div data-ring="{{ profile_completion }}" data-ring-size="56" data-ring-color="{{ 'var(--success)' if profile_completion >= 80 else 'var(--primary)' if profile_completion >= 50 else 'var(--warning)' }}" data-ring-label=""></div>
+            </div>
+        </div>
+        <div style="font-size:var(--text-xs); color:var(--primary); font-weight:600; margin-top:var(--space-2);">Click to complete →</div>
+    </a>
+
+    <!-- ATS Score -->
+    <a href="{{ url_for('analysis.index') }}" class="stat-card" style="text-decoration:none; cursor:pointer; transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='var(--shadow-lg)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between;">
+            <div>
+                <div class="stat-card-label">Avg ATS Score</div>
+                <div class="stat-card-value" data-count-to="{{ avg_ats }}" data-count-suffix="%">0%</div>
+                <div class="stat-card-trend {{ 'up' if avg_ats >= 70 else 'neutral' if avg_ats >= 40 else 'down' }}">
+                    <i class="bi bi-{{ 'check-circle-fill' if avg_ats >= 70 else 'dash-circle-fill' if avg_ats >= 40 else 'exclamation-circle-fill' }}"></i>
+                    {{ 'ATS Friendly' if avg_ats >= 70 else 'Improving' if avg_ats >= 40 else 'Needs Work' }}
+                </div>
+            </div>
+            <div class="stat-card-icon" style="background:var(--accent-50);">
+                <div data-ring="{{ avg_ats }}" data-ring-size="56" data-ring-color="{{ 'var(--success)' if avg_ats >= 80 else 'var(--accent)' if avg_ats >= 60 else 'var(--warning)' if avg_ats >= 40 else 'var(--danger)' }}" data-ring-label=""></div>
+            </div>
+        </div>
+        <div style="font-size:var(--text-xs); color:var(--primary); font-weight:600; margin-top:var(--space-2);">Run Analysis →</div>
+    </a>
+
+    <!-- Analyses Run -->
+    <a href="{{ url_for('analysis.index') }}" class="stat-card" style="text-decoration:none; cursor:pointer; transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='var(--shadow-lg)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between;">
+            <div>
+                <div class="stat-card-label">Analyses Run</div>
+                <div class="stat-card-value" data-count-to="{{ total_analyses }}">0</div>
+                <div class="stat-card-sub" style="font-size:var(--text-xs); color:var(--text-3); margin-top:4px;">
+                    AI-powered resume checks
+                </div>
+            </div>
+            <div class="stat-card-icon" style="background:var(--secondary-50); color:var(--secondary); font-size:1.4rem;">
+                <i class="bi bi-graph-up-arrow"></i>
+            </div>
+        </div>
+        <div style="font-size:var(--text-xs); color:var(--primary); font-weight:600; margin-top:var(--space-2);">View All →</div>
+    </a>
+
+    <!-- Resumes -->
+    <a href="{{ url_for('resumes.index') }}" class="stat-card" style="text-decoration:none; cursor:pointer; transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='var(--shadow-lg)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between;">
+            <div>
+                <div class="stat-card-label">My Resumes</div>
+                <div class="stat-card-value" data-count-to="{{ resume_count }}">0</div>
+                <div class="stat-card-sub" style="font-size:var(--text-xs); color:var(--text-3); margin-top:4px;">
+                    Uploaded &amp; AI-generated
+                </div>
+            </div>
+            <div class="stat-card-icon" style="background:var(--success-100); color:var(--success); font-size:1.4rem;">
+                <i class="bi bi-file-earmark-text-fill"></i>
+            </div>
+        </div>
+        <div style="font-size:var(--text-xs); color:var(--primary); font-weight:600; margin-top:var(--space-2);">Manage Resumes →</div>
+    </a>
+
+    <!-- Interview Practice -->
+    <a href="{{ url_for('interview.index') }}" class="stat-card" style="text-decoration:none; cursor:pointer; transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='var(--shadow-lg)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between;">
+            <div>
+                <div class="stat-card-label">Interview Practice</div>
+                <div class="stat-card-value" data-count-to="{{ interview_answered }}">0</div>
+                <div class="stat-card-sub" style="font-size:var(--text-xs); color:var(--text-3); margin-top:4px;">
+                    of {{ interview_total }} questions answered
+                </div>
+            </div>
+            <div class="stat-card-icon" style="background:#FEF3C7; color:#D97706; font-size:1.4rem;">
+                <i class="bi bi-chat-quote-fill"></i>
+            </div>
+        </div>
+        <div style="font-size:var(--text-xs); color:var(--primary); font-weight:600; margin-top:var(--space-2);">Practice Now →</div>
+    </a>
+
+    <!-- Roadmap Progress -->
+    <a href="{{ url_for('roadmap.index') }}" class="stat-card" style="text-decoration:none; cursor:pointer; transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='var(--shadow-lg)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between;">
+            <div>
+                <div class="stat-card-label">Roadmap Progress</div>
+                <div class="stat-card-value" data-count-to="{{ roadmap_progress }}" data-count-suffix="%">0%</div>
+                <div class="stat-card-trend {{ 'up' if roadmap_progress >= 60 else 'neutral' if roadmap_progress > 0 else 'down' }}">
+                    <i class="bi bi-{{ 'check2-all' if roadmap_progress >= 60 else 'map' if roadmap_progress > 0 else 'map' }}"></i>
+                    {{ 'On Track!' if roadmap_progress >= 60 else 'In Progress' if roadmap_progress > 0 else 'Not Started' }}
+                </div>
+            </div>
+            <div class="stat-card-icon" style="background:#F0FDF4; color:var(--success); font-size:1.4rem;">
+                <i class="bi bi-map-fill"></i>
+            </div>
+        </div>
+        <div style="font-size:var(--text-xs); color:var(--primary); font-weight:600; margin-top:var(--space-2);">View Roadmap →</div>
+    </a>
+
+</div>
+
+
+
+<!-- ── MAIN GRID ───────────────────────────────────────────── -->
+
+<div style="display:grid; grid-template-columns: 1fr 360px; gap:var(--space-5);">
+
+<!-- LEFT COLUMN -->
+<div style="display:flex; flex-direction:column; gap:var(--space-5);">
+
+    <!-- Recent Analyses -->
+    <div class="card fade-in-up-delay-2">
+        <div class="card-header">
+            <span class="card-header-title">
+                <i class="bi bi-graph-up-arrow text-primary"></i> Recent Analyses
+            </span>
+            <a href="{{ url_for('analysis.index') }}" class="btn btn-sm btn-outline-primary">View All</a>
+        </div>
+        <div class="card-body" style="padding:0;">
+            {% if recent_analyses %}
+            <div>
+                {% for a in recent_analyses %}
+                <a href="{{ url_for('analysis.index', analysis_id=a.id) }}"
+                   class="analysis-card"
+                   style="border:none; border-bottom:1px solid var(--border); border-radius:0; {% if loop.last %}border-bottom:none;{% endif %}">
+                    <!-- Company Avatar -->
+                    <div class="company-logo" style="width:40px; height:40px; font-size:var(--text-base); border-radius:var(--radius-sm); background:linear-gradient(135deg, {{ ['#4F46E5','#7C3AED','#0891B2','#059669','#D97706'][loop.index0 % 5] }}, {{ ['#7C3AED','#4F46E5','#7C3AED','#0891B2','#059669'][loop.index0 % 5] }});">
+                        {{ (a.company_name or a.job_title or 'G')[0].upper() if a else 'G' }}
+                    </div>
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-size:var(--text-sm); font-weight:700; color:var(--text-1); truncate;">
+                            {{ a.company_name if a.company_name else 'General Analysis' }}
+                        </div>
+                        <div style="font-size:var(--text-xs); color:var(--text-3);">
+                            {{ a.job_title or 'Resume Analysis' }} &bull; {{ a.created_at.strftime('%d %b') if a.created_at else '' }}
+                        </div>
+                    </div>
+                    <!-- Match Score -->
+                    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
+                        <div style="font-size:var(--text-xs); font-weight:600; color:var(--text-3);">Match Score</div>
+                        <span class="badge {{ 'badge-success' if a.skill_match_score >= 70 else 'badge-warning' if a.skill_match_score >= 40 else 'badge-danger' }}" style="font-size:0.8rem;">
+                            {{ a.skill_match_score }}%
+                        </span>
+                    </div>
+                    <!-- Score Bar -->
+                    <div style="width:80px;">
+                        <div class="progress" style="height:6px;">
+                            <div class="progress-bar" data-width="{{ a.overall_score }}%" style="width:0%"></div>
+                        </div>
+                        <div style="font-size:10px; color:var(--text-3); text-align:right; margin-top:2px;">{{ a.overall_score }}% overall</div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding:var(--space-10);">
+                <div class="empty-state-icon"><i class="bi bi-graph-up"></i></div>
+                <div class="empty-state-title">No analyses yet</div>
+                <div class="empty-state-desc">Upload a resume and run an AI analysis to see your career readiness score.</div>
+                <a href="{{ url_for('analysis.index') }}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-play-circle"></i> Run First Analysis
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Skill Proficiency -->
+    <div class="card fade-in-up-delay-3">
+        <div class="card-header">
+            <span class="card-header-title">
+                <i class="bi bi-radar text-primary"></i> Skill Proficiency
+            </span>
+            <a href="{{ url_for('profile.index') }}" class="btn btn-sm btn-ghost">
+                <i class="bi bi-plus"></i> Add Skill
+            </a>
+        </div>
+        <div class="card-body">
+            {% if skills %}
+            <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+                {% for skill in skills[:10] %}
+                {% set pct = skill.proficiency_percent or 50 %}
+                {% set prof = skill.proficiency or 'Intermediate' %}
+                <div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;">
+                        <div style="display:flex; align-items:center; gap:var(--space-2);">
+                            <span style="font-size:var(--text-sm); font-weight:600; color:var(--text-1);">{{ skill.skill_name }}</span>
+                            <span class="badge {{ 'badge-success' if prof == 'Expert' else 'badge-primary' if prof == 'Advanced' else 'badge-warning' if prof == 'Intermediate' else 'badge-neutral' }}"
+                                  style="font-size:0.65rem; padding:1px 6px;">{{ prof }}</span>
+                        </div>
+                        <span style="font-size:var(--text-xs); font-weight:700; color:{{ 'var(--success)' if pct >= 80 else 'var(--primary)' if pct >= 60 else 'var(--warning)' if pct >= 40 else 'var(--danger)' }};">{{ pct }}%</span>
+                    </div>
+                    <div class="progress" style="height:7px; border-radius:var(--radius-full);">
+                        <div class="progress-bar" data-width="{{ pct }}%"
+                             style="width:0%; border-radius:var(--radius-full);
+                                    background:{{ 'var(--success)' if pct >= 80 else 'linear-gradient(90deg,var(--primary),var(--primary-400))' if pct >= 60 else 'var(--warning)' if pct >= 40 else 'var(--danger)' }};"></div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% if skills|length > 10 %}
+                <div style="text-align:center; margin-top:var(--space-2);">
+                    <a href="{{ url_for('profile.index') }}" style="font-size:var(--text-xs); color:var(--primary); font-weight:600;">
+                        +{{ skills|length - 10 }} more skills →
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding:var(--space-8);">
+                <div class="empty-state-icon" style="font-size:1.5rem;">🎯</div>
+                <div class="empty-state-title">No skills added</div>
+                <div class="empty-state-desc">Add your skills to the profile to see proficiency here.</div>
+                <a href="{{ url_for('profile.index') }}" class="btn btn-primary btn-sm">Add Skills</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div><!-- LEFT COLUMN -->
+
+<!-- RIGHT COLUMN -->
+<div style="display:flex; flex-direction:column; gap:var(--space-5);">
+
+    <!-- Quick Actions -->
+    <div class="card fade-in-up-delay-2">
+        <div class="card-header">
+            <span class="card-header-title"><i class="bi bi-lightning-charge-fill text-warning"></i> Quick Actions</span>
+        </div>
+        <div class="card-body" style="display:flex; flex-direction:column; gap:var(--space-2);">
+            <a href="{{ url_for('resume_builder.create') }}" class="quick-action highlight">
+                <i class="bi bi-stars"></i> <span>Create AI Resume</span>
+            </a>
+            <a href="{{ url_for('resumes.index') }}" class="quick-action">
+                <i class="bi bi-upload"></i> <span>Upload Resume</span>
+            </a>
+            <a href="{{ url_for('analysis.index') }}" class="quick-action">
+                <i class="bi bi-graph-up-arrow"></i> <span>Run AI Analysis</span>
+            </a>
+            <a href="{{ url_for('company.index') }}" class="quick-action">
+                <i class="bi bi-building-fill"></i> <span>Browse Companies</span>
+            </a>
+            <a href="{{ url_for('roadmap.index') }}" class="quick-action">
+                <i class="bi bi-map-fill"></i> <span>Learning Roadmap</span>
+            </a>
+            <a href="{{ url_for('reports.index') }}" class="quick-action">
+                <i class="bi bi-file-bar-graph-fill"></i> <span>Generate Report</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="card fade-in-up-delay-3">
+        <div class="card-header">
+            <span class="card-header-title"><i class="bi bi-activity text-primary"></i> Recent Activity</span>
+        </div>
+        <div class="card-body" style="padding-top:var(--space-3);">
+            {% if recent_activity %}
+            {% set act_icons = {
+                'login': ('bi-box-arrow-in-right', 'var(--info-50)', 'var(--info)'),
+                'logout': ('bi-box-arrow-right', 'var(--surface-3)', 'var(--text-3)'),
+                'resume_upload': ('bi-file-earmark-arrow-up', 'var(--success-100)', 'var(--success)'),
+                'analysis_run': ('bi-graph-up-arrow', 'var(--primary-50)', 'var(--primary)'),
+                'resume_generate': ('bi-stars', 'var(--secondary-50)', 'var(--secondary)'),
+                'interview_generate': ('bi-chat-dots', 'var(--warning-100)', 'var(--warning)'),
+            } %}
+            {% for act in recent_activity[:6] %}
+            {% set icon_data = act_icons.get(act.action, ('bi-circle', 'var(--surface-3)', 'var(--text-3)')) %}
+            <div class="activity-item">
+                <div class="activity-dot" style="background:{{ icon_data[1] }}; box-shadow:none;">
+                    <i class="bi {{ icon_data[0] }}" style="color:{{ icon_data[2] }}; font-size:0.85rem;"></i>
+                </div>
+                <div>
+                    <div class="activity-content-text">{{ act.description or act.action | replace('_', ' ') | title }}</div>
+                    <div class="activity-time">{{ act.created_at.strftime('%d %b, %H:%M') if act.created_at else '' }}</div>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state" style="padding:var(--space-6);">
+                <div class="empty-state-title" style="font-size:var(--text-sm);">No activity yet</div>
+                <div class="empty-state-desc" style="font-size:var(--text-xs);">Your actions will appear here.</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Target Companies -->
+    <div class="card fade-in-up-delay-4">
+        <div class="card-header">
+            <span class="card-header-title"><i class="bi bi-building-fill text-primary"></i> Companies</span>
+            <a href="{{ url_for('company.index') }}" class="btn btn-sm btn-ghost text-sm">Explore →</a>
+        </div>
+        <div class="card-body" style="display:flex; flex-direction:column; gap:var(--space-3);">
+            {% for co in recommended_companies[:4] %}
+            <a href="{{ url_for('company.detail', slug=co.slug) }}" style="display:flex; align-items:center; gap:var(--space-3); text-decoration:none;">
+                <div class="company-logo" style="width:36px; height:36px; font-size:0.85rem; font-weight:800; border-radius:var(--radius-sm); flex-shrink:0; background:linear-gradient(135deg, {{ ['#4F46E5','#7C3AED','#0891B2','#059669','#D97706'][loop.index0 % 5] }}, {{ ['#7C3AED','#4F46E5','#7C3AED','#0891B2','#059669'][loop.index0 % 5] }});">
+                    {{ co.name[:2].upper() }}
+                </div>
+                <div style="min-width:0; flex:1;">
+                    <div style="font-size:var(--text-sm); font-weight:600; color:var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ co.name }}</div>
+                    <div style="font-size:var(--text-xs); color:var(--text-3);">{{ co.industry }}</div>
+                </div>
+                <i class="bi bi-chevron-right" style="color:var(--text-3); font-size:0.75rem; flex-shrink:0;"></i>
+            </a>
+            {% else %}
+            <div class="text-muted text-sm">No companies found.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div><!-- RIGHT COLUMN -->
+</div><!-- MAIN GRID -->
+
+</div><!-- stagger-children -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Progress bars are initialized by main.js initProgressBars()
+    // Cards clickable via href links in HTML
+});
+</script>
+{% endblock %}

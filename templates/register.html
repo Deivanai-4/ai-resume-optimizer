@@ -1,0 +1,135 @@
+{% extends "auth_base.html" %}
+{% block title %}Create Account — AI Career Intelligence Platform{% endblock %}
+
+{% block content %}
+<div class="fade-in-up">
+    <h1 class="auth-title" style="text-align:center; font-size:2rem; font-weight:700; color:#111;">Create your account</h1>
+    <p class="auth-sub" style="text-align:center; color:#444; margin-bottom:2rem;">Join thousands of students using AI to land their dream job.</p>
+
+    <form action="{{ url_for('auth.register') }}" method="POST" id="registerForm">
+        <div style="display:flex; flex-direction:column; gap:1.25rem; margin-bottom:1.5rem;">
+            <div>
+                <label class="form-label" for="full_name" style="color:#111; font-weight:600; margin-bottom:0.25rem;">Full Name</label>
+                <div class="input-icon-wrap" style="position:relative;">
+                    <i class="bi bi-person" style="position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:#666;"></i>
+                    <input type="text" class="form-control" id="full_name" name="full_name"
+                           required autocomplete="name" placeholder="Enter your full name"
+                           value="{{ request.form.get('full_name', '') }}"
+                           style="padding-left:2.75rem; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.8); color:#111; border-radius:100px; height:48px;">
+                </div>
+            </div>
+            <div>
+                <label class="form-label" for="email" style="color:#111; font-weight:600; margin-bottom:0.25rem;">Email Address</label>
+                <div class="input-icon-wrap" style="position:relative;">
+                    <i class="bi bi-envelope" style="position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:#666;"></i>
+                    <input type="email" class="form-control" id="email" name="email"
+                           required autocomplete="email" placeholder="Enter your email address"
+                           value="{{ request.form.get('email', '') }}"
+                           style="padding-left:2.75rem; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.8); color:#111; border-radius:100px; height:48px;">
+                </div>
+            </div>
+            <div>
+                <label class="form-label" for="password" style="color:#111; font-weight:600; margin-bottom:0.25rem;">Password</label>
+                <div class="input-icon-wrap" style="position:relative;">
+                    <i class="bi bi-lock" style="position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:#666;"></i>
+                    <input type="password" class="form-control" id="password" name="password"
+                           required autocomplete="new-password" placeholder="Enter a strong password (Min. 8 characters)"
+                           oninput="checkStrength(this.value)"
+                           style="padding-left:2.75rem; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.8); color:#111; border-radius:100px; height:48px;">
+                    <button type="button" onclick="togglePass('password','eye1')"
+                            style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#666;">
+                        <i class="bi bi-eye" id="eye1"></i>
+                    </button>
+                </div>
+                <!-- Strength bar -->
+                <div style="margin-top:8px; padding:0 8px;">
+                    <div style="height:4px; background:rgba(0,0,0,0.1); border-radius:10px; overflow:hidden;">
+                        <div id="strengthBar" style="height:100%; width:0%; transition:width 0.3s, background 0.3s; border-radius:10px;"></div>
+                    </div>
+                    <div id="strengthLabel" style="font-size:0.75rem; color:#666; margin-top:4px;"></div>
+                </div>
+            </div>
+            <div>
+                <label class="form-label" for="confirm_password" style="color:#111; font-weight:600; margin-bottom:0.25rem;">Confirm Password</label>
+                <div class="input-icon-wrap" style="position:relative;">
+                    <i class="bi bi-lock-fill" style="position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:#666;"></i>
+                    <input type="password" class="form-control" id="confirm_password" name="confirm_password"
+                           required autocomplete="new-password" placeholder="Confirm your password"
+                           style="padding-left:2.75rem; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.8); color:#111; border-radius:100px; height:48px;">
+                    <button type="button" onclick="togglePass('confirm_password','eye2')"
+                            style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#666;">
+                        <i class="bi bi-eye" id="eye2"></i>
+                    </button>
+                </div>
+            </div>
+            <div style="display:flex; align-items:flex-start; gap:0.75rem; padding:0 0.5rem;">
+                <input type="checkbox" id="terms" name="terms" class="form-check-input" required
+                       style="margin-top:4px; flex-shrink:0;">
+                <label for="terms" style="font-size:0.8rem; color:#444; cursor:pointer; line-height:1.5;">
+                    I agree to the <a href="#" style="color:#4F46E5;">Terms of Service</a> and
+                    <a href="#" style="color:#4F46E5;">Privacy Policy</a>.
+                </label>
+            </div>
+        </div>
+
+        <button type="submit" class="btn w-100" style="height:48px; border-radius:100px; font-weight:600; background:linear-gradient(to right, #00c6ff, #0072ff); color:white; border:none; box-shadow:0 4px 15px rgba(0, 114, 255, 0.3);" id="submitBtn">
+            Create Account <i class="bi bi-arrow-right ms-1"></i>
+        </button>
+    </form>
+
+    <div class="divider-text" style="margin:1.5rem 0; color:#111;">Already have an account?</div>
+
+    <a href="{{ url_for('auth.login') }}" class="btn w-100" style="height:48px; border-radius:100px; font-weight:600; background:transparent; border:1.5px solid #fff; color:#fff; display:flex; align-items:center; justify-content:center; gap:0.5rem; text-decoration:none;">
+        <i class="bi bi-box-arrow-in-right"></i> Sign In
+    </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function togglePass(id, iconId) {
+    const inp = document.getElementById(id);
+    const icon = document.getElementById(iconId);
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+    icon.className = inp.type === 'text' ? 'bi bi-eye-slash' : 'bi bi-eye';
+}
+
+function checkStrength(val) {
+    const bar = document.getElementById('strengthBar');
+    const label = document.getElementById('strengthLabel');
+    let score = 0;
+    if (val.length >= 8) score++;
+    if (/[A-Z]/.test(val)) score++;
+    if (/[0-9]/.test(val)) score++;
+    if (/[^A-Za-z0-9]/.test(val)) score++;
+
+    const levels = [
+        { pct: '0%',   color: 'transparent', text: '' },
+        { pct: '25%',  color: '#dc3545', text: 'Weak' },
+        { pct: '50%',  color: '#ffc107', text: 'Fair' },
+        { pct: '75%',  color: '#0d6efd', text: 'Good' },
+        { pct: '100%', color: '#198754', text: 'Strong ✓' },
+    ];
+    const lvl = levels[score] || levels[0];
+    bar.style.width = lvl.pct;
+    bar.style.background = lvl.color;
+    label.textContent = lvl.text;
+    label.style.color = lvl.color;
+}
+
+document.getElementById('registerForm').addEventListener('submit', function(e) {
+    const p1 = document.getElementById('password').value;
+    const p2 = document.getElementById('confirm_password').value;
+    if (p1 !== p2) {
+        e.preventDefault();
+        document.getElementById('confirm_password').classList.add('is-invalid');
+        const err = document.createElement('div');
+        err.className = 'form-text';
+        err.style.color = '#dc3545';
+        err.textContent = 'Passwords do not match.';
+        document.getElementById('confirm_password').after(err);
+        setTimeout(() => err.remove(), 3000);
+    }
+});
+</script>
+{% endblock %}

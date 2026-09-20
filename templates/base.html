@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI Career Intelligence Platform{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}AI-powered career intelligence platform for placement readiness{% endblock %}">
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <!-- Design System -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+<div class="wrapper">
+
+    <!-- ── SIDEBAR ──────────────────────────────────────────── -->
+    <nav id="sidebar" role="navigation" aria-label="Main navigation">
+
+        <!-- Brand and Toggle -->
+        <div class="sidebar-header" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-right: var(--space-4);">
+            <a href="{{ url_for('dashboard.index') }}" class="sidebar-brand" style="border-bottom: none; padding-right: 0; flex: 1;">
+                <div class="sidebar-brand-icon ai-pulse">
+                    <i class="bi bi-cpu-fill"></i>
+                </div>
+                <div class="sidebar-brand-text">
+                    <span class="sidebar-brand-name">AI Career</span>
+                    <span class="sidebar-brand-tag">Intelligence Platform</span>
+                </div>
+            </a>
+            <!-- Mobile + Desktop collapse toggle moved here -->
+            <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar" aria-expanded="true">
+                <i class="bi bi-list"></i>
+            </button>
+        </div>
+
+        <!-- Navigation Links -->
+        <div class="sidebar-nav">
+
+            <span class="nav-section-label">Main</span>
+
+            <a href="{{ url_for('dashboard.index') }}"
+               class="sidebar-nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}"
+               aria-label="Dashboard">
+                <i class="bi bi-grid-1x2-fill"></i>
+                <span>Dashboard</span>
+            </a>
+
+            <a href="{{ url_for('profile.index') }}"
+               class="sidebar-nav-link {% if request.endpoint and request.endpoint.startswith('profile') %}active{% endif %}"
+               aria-label="My Profile">
+                <i class="bi bi-person-circle"></i>
+                <span>My Profile</span>
+            </a>
+
+            <a href="{{ url_for('resumes.index') }}"
+               class="sidebar-nav-link {% if request.endpoint and request.endpoint.startswith('resumes') %}active{% endif %}"
+               aria-label="My Resumes">
+                <i class="bi bi-file-earmark-text-fill"></i>
+                <span>My Resumes</span>
+            </a>
+
+            <div class="divider"></div>
+            <span class="nav-section-label">AI Tools</span>
+
+            <a href="{{ url_for('resume_builder.create') }}"
+               class="sidebar-nav-link {% if request.endpoint and request.endpoint.startswith('resume_builder') %}active{% endif %}"
+               aria-label="AI Resume Builder">
+                <i class="bi bi-stars"></i>
+                <span>Resume Builder</span>
+            </a>
+
+            <a href="{{ url_for('optimize.index') }}"
+               class="sidebar-nav-link {% if request.endpoint and request.endpoint.startswith('optimize') %}active{% endif %}"
+               aria-label="AI Resume Tailor">
+                <i class="bi bi-magic"></i>
+                <span>AI Resume Tailor</span>
+            </a>
+
+            <a href="{{ url_for('analysis.index') }}"
+               class="sidebar-nav-link {% if request.endpoint and request.endpoint.startswith('analysis') %}active{% endif %}"
+               aria-label="AI Analysis">
+                <i class="bi bi-graph-up-arrow"></i>
+                <span>AI Analysis</span>
+            </a>
+
+            <div class="divider"></div>
+            <span class="nav-section-label">Career</span>
+
+            <a href="{{ url_for('company.index') }}"
+               class="sidebar-nav-link {% if request.endpoint and request.endpoint.startswith('company') %}active{% endif %}"
+               aria-label="Company Intelligence">
+                <i class="bi bi-building-fill"></i>
+                <span>Companies</span>
+            </a>
+
+            <a href="{{ url_for('roadmap.index') }}"
+               class="sidebar-nav-link {% if request.endpoint and request.endpoint.startswith('roadmap') %}active{% endif %}"
+               aria-label="Learning Roadmap">
+                <i class="bi bi-map-fill"></i>
+                <span>Learning Roadmap</span>
+            </a>
+
+            <a href="{{ url_for('interview.index') }}"
+               class="sidebar-nav-link {% if request.endpoint and request.endpoint.startswith('interview') %}active{% endif %}"
+               aria-label="Interview Preparation">
+                <i class="bi bi-chat-square-dots-fill"></i>
+                <span>Interview Prep</span>
+            </a>
+
+            <a href="{{ url_for('reports.index') }}"
+               class="sidebar-nav-link {% if request.endpoint and request.endpoint.startswith('reports') %}active{% endif %}"
+               aria-label="Reports">
+                <i class="bi bi-file-bar-graph-fill"></i>
+                <span>Reports</span>
+            </a>
+
+            <div class="divider"></div>
+
+            <a href="{{ url_for('settings.index') }}"
+               class="sidebar-nav-link {% if request.endpoint and request.endpoint.startswith('settings') %}active{% endif %}"
+               aria-label="Settings">
+                <i class="bi bi-gear-fill"></i>
+                <span>Settings</span>
+            </a>
+
+            <a href="{{ url_for('auth.logout') }}"
+               class="sidebar-nav-link text-danger"
+               aria-label="Logout">
+                <i class="bi bi-box-arrow-right"></i>
+                <span>Logout</span>
+            </a>
+
+        </div>
+
+        <!-- Profile Completion -->
+        {% if current_profile_completion is defined and current_profile_completion < 100 %}
+        <div class="sidebar-completion">
+            <div class="sidebar-completion-label">
+                <span>Profile</span>
+                <span>{{ current_profile_completion }}%</span>
+            </div>
+            <div class="sidebar-completion-bar">
+                <div class="sidebar-completion-fill" style="width: {{ current_profile_completion }}%"></div>
+            </div>
+        </div>
+        {% endif %}
+    </nav>
+
+    <!-- Sidebar overlay for mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay" aria-hidden="true"></div>
+
+    <!-- ── MAIN CONTENT ──────────────────────────────────────── -->
+    <div id="main-content">
+
+        <!-- Top Navbar -->
+        <header class="top-navbar" role="banner">
+            <div class="topbar-left">
+                <h1 class="topbar-page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+            </div>
+
+            <div class="topbar-right">
+                <!-- Profile Completion Pill -->
+                {% if current_profile_completion is defined and current_profile_completion < 100 %}
+                <a href="{{ url_for('profile.index') }}" class="topbar-completion-pill" title="Complete your profile">
+                    <i class="bi bi-person-fill-check"></i>
+                    <span class="d-none d-lg-inline">Profile</span>
+                    <strong>{{ current_profile_completion }}%</strong>
+                </a>
+                {% endif %}
+
+                <!-- User Dropdown -->
+                <div class="dropdown">
+                    <button class="user-menu-btn" type="button"
+                            data-bs-toggle="dropdown" aria-expanded="false"
+                            aria-haspopup="true" id="userMenuBtn">
+                        <div class="user-avatar-initials" aria-hidden="true">
+                            {{ (current_user_name or 'U')[0].upper() }}{% if current_user_name and ' ' in current_user_name %}{{ current_user_name.split()[1][0].upper() }}{% endif %}
+                        </div>
+                        <span class="user-menu-name d-none d-md-block">
+                            {{ current_user_name.split()[0] if current_user_name else 'User' }}
+                        </span>
+                        <i class="bi bi-chevron-down text-muted" style="font-size:0.7rem;"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuBtn">
+                        <li class="px-3 py-2">
+                            <div class="fw-semibold text-sm">{{ current_user_name }}</div>
+                            <div class="text-muted" style="font-size:0.75rem;">{{ current_user_email }}</div>
+                            {% if current_profile_completion is defined %}
+                            <div style="margin-top:6px;">
+                                <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:var(--text-3); margin-bottom:3px;">
+                                    <span>Profile</span><span>{{ current_profile_completion }}%</span>
+                                </div>
+                                <div style="height:4px; background:var(--border); border-radius:2px;">
+                                    <div style="height:4px; background:var(--primary); border-radius:2px; width:{{ current_profile_completion }}%;"></div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a class="dropdown-item" href="{{ url_for('profile.index') }}">
+                                <i class="bi bi-person"></i> My Profile
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="{{ url_for('settings.index') }}">
+                                <i class="bi bi-gear"></i> Settings
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}">
+                                <i class="bi bi-box-arrow-right"></i> Logout
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </header>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="px-4 pt-3">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show"
+                     role="alert">
+                    <i class="bi bi-{% if category == 'success' %}check-circle-fill{% elif category in ('danger','error') %}exclamation-circle-fill{% elif category == 'warning' %}exclamation-triangle-fill{% else %}info-circle-fill{% endif %} me-2"></i>
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Page Content -->
+        <main class="page-content page-enter" id="pageContent">
+            {% block content %}{% endblock %}
+        </main>
+
+    </div><!-- #main-content -->
+</div><!-- .wrapper -->
+
+<!-- Toast Stack -->
+<div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
+
+<!-- Bootstrap 5 JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

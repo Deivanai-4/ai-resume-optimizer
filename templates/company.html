@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+{% block title %}Company Intelligence — AI Career Intelligence Platform{% endblock %}
+{% block page_title %}Company Intelligence{% endblock %}
+
+{% block content %}
+<div class="stagger-children">
+
+<!-- ── HEADER + SEARCH ──────────────────────────────────────── -->
+<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-4); margin-bottom:var(--space-6);" class="fade-in-up">
+    <div>
+        <h1 style="font-size:var(--text-2xl); font-weight:800; margin-bottom:var(--space-1);">Company Intelligence</h1>
+        <p style="color:var(--text-3); font-size:var(--text-sm); margin:0;">Explore companies, their tech stacks, and how well your profile matches.</p>
+    </div>
+    <form action="{{ url_for('company.index') }}" method="GET" style="display:flex; gap:var(--space-2);">
+        <div class="search-box" style="max-width:280px;">
+            <i class="bi bi-search search-icon"></i>
+            <input type="text" name="q" class="form-control" placeholder="Search companies…"
+                   value="{{ search_query }}" autocomplete="off">
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+    </form>
+</div>
+
+{% if selected_company %}
+<!-- ── COMPANY DETAIL VIEW ─────────────────────────────────── -->
+<div class="fade-in-up-delay-1">
+    <!-- Back + Breadcrumb -->
+    <div style="margin-bottom:var(--space-4);">
+        <a href="{{ url_for('company.index') }}" class="btn btn-ghost btn-sm">
+            <i class="bi bi-arrow-left"></i> All Companies
+        </a>
+    </div>
+
+    <!-- Company Header Card -->
+    <div class="card" style="margin-bottom:var(--space-5);">
+        <div class="card-body" style="display:flex; align-items:flex-start; gap:var(--space-6); flex-wrap:wrap;">
+            <!-- Logo -->
+            <div class="company-logo" style="width:72px; height:72px; font-size:var(--text-2xl); font-weight:900; flex-shrink:0; border-radius:var(--radius-lg);">
+                {{ selected_company.name[:2].upper() }}
+            </div>
+
+            <div style="flex:1; min-width:200px;">
+                <h2 style="font-size:var(--text-2xl); font-weight:800; margin-bottom:var(--space-2);">{{ selected_company.name }}</h2>
+                <div style="display:flex; flex-wrap:wrap; gap:var(--space-2); margin-bottom:var(--space-3);">
+                    {% if selected_company.industry %}
+                    <span class="badge badge-primary">{{ selected_company.industry }}</span>
+                    {% endif %}
+                    {% if selected_company.company_size %}
+                    <span class="badge badge-neutral"><i class="bi bi-people"></i> {{ selected_company.company_size }}</span>
+                    {% endif %}
+                    {% if selected_company.location %}
+                    <span class="badge badge-neutral"><i class="bi bi-geo-alt"></i> {{ selected_company.location }}</span>
+                    {% endif %}
+                    {% if selected_company.founded_year %}
+                    <span class="badge badge-neutral">Est. {{ selected_company.founded_year }}</span>
+                    {% endif %}
+                </div>
+                {% if selected_company.description %}
+                <p style="font-size:var(--text-sm); color:var(--text-2); line-height:1.7; margin:0;">
+                    {{ selected_company.description[:300] }}{% if selected_company.description|length > 300 %}…{% endif %}
+                </p>
+                {% endif %}
+            </div>
+
+            <!-- Match Ring -->
+            <div style="text-align:center; flex-shrink:0;">
+                <div data-ring="{{ match_percent }}"
+                     data-ring-size="80"
+                     data-ring-color="{{ 'var(--success)' if match_percent >= 70 else 'var(--warning)' if match_percent >= 40 else 'var(--danger)' }}"
+                     data-ring-label="Match"
+                     style="margin:0 auto var(--space-2);"></div>
+                <div style="font-size:var(--text-xs); font-weight:600; color:var(--text-3);">Your Match</div>
+            </div>
+        </div>
+
+        <div class="card-footer" style="display:flex; gap:var(--space-3);">
+            <a href="{{ url_for('analysis.index', company_id=selected_company.id) }}" class="btn btn-primary btn-sm">
+                <i class="bi bi-graph-up-arrow"></i> Analyze My Fit
+            </a>
+            <a href="{{ url_for('interview.index') }}" class="btn btn-sm btn-secondary">
+                <i class="bi bi-chat-dots"></i> Practice Interview
+            </a>
+            {% if selected_company.website %}
+            <a href="{{ selected_company.website }}" target="_blank" class="btn btn-ghost btn-sm">
+                <i class="bi bi-globe2"></i> Website
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tabs: Tech Stack / Jobs / Recruitment -->
+    <div class="nav-tabs-line" style="margin-bottom:var(--space-4);" data-tab-group="company-detail">
+        <button class="tab-btn active" data-tab="tech">
+            <i class="bi bi-cpu me-1"></i> Tech Stack
+        </button>
+        <button class="tab-btn" data-tab="jobs">
+            <i class="bi bi-briefcase me-1"></i> Open Roles
+            {% if jobs %}<span class="nav-badge ms-1">{{ jobs|length }}</span>{% endif %}
+        </button>
+        {% if selected_company.recruitment_process %}
+        <button class="tab-btn" data-tab="process">
+            <i class="bi bi-diagram-3 me-1"></i> Hiring Process
+        </button>
+        {% endif %}
+    </div>
+
+    <!-- Tech Stack -->
+    <div data-tab-panel="company-detail" data-tab="tech" class="fade-in">
+        {% if skills_by_category %}
+        <div class="grid-2">
+            {% for cat, cat_skills in skills_by_category.items() %}
+            <div class="card">
+                <div class="card-header" style="padding:var(--space-3) var(--space-5);">
+                    <span class="card-header-title" style="font-size:var(--text-sm);">
+                        {% set cat_icons = {'Programming':'bi-code-slash','Framework':'bi-layers','Database':'bi-database','Cloud':'bi-cloud','DevOps':'bi-gear','Tool':'bi-wrench','Soft Skill':'bi-people','Other':'bi-tag'} %}
+                        <i class="bi {{ cat_icons.get(cat, 'bi-tag') }} text-primary"></i> {{ cat }}
+                    </span>
+                    <span class="badge badge-neutral">{{ cat_skills|length }}</span>
+                </div>
+                <div class="card-body" style="display:flex; flex-wrap:wrap; gap:var(--space-2);">
+                    {% for skill in cat_skills %}
+                    {% set is_matched = skill.skill_name in matched_skills %}
+                    <span class="skill-chip {{ 'matched' if is_matched else '' }}" title="{{ 'You have this skill!' if is_matched else 'Not in your profile' }}">
+                        {% if is_matched %}<i class="bi bi-check2"></i>{% endif %}
+                        {{ skill.skill_name }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Legend -->
+        <div style="display:flex; gap:var(--space-4); margin-top:var(--space-4); font-size:var(--text-xs); color:var(--text-3);">
+            <span><span class="skill-chip matched" style="font-size:10px;">✓ Matched</span> &nbsp; You have this skill</span>
+            <span><span class="skill-chip" style="font-size:10px;">Skill</span> &nbsp; Not in your profile</span>
+        </div>
+        {% else %}
+        <div class="empty-state card">
+            <div class="empty-state-icon"><i class="bi bi-cpu"></i></div>
+            <div class="empty-state-title">No tech stack data</div>
+            <div class="empty-state-desc">Technology requirements for this company haven't been added yet.</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Jobs -->
+    <div data-tab-panel="company-detail" data-tab="jobs" style="display:none;" class="fade-in">
+        {% if jobs %}
+        <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+            {% for job in jobs %}
+            <div class="card card-hover">
+                <div class="card-body" style="display:flex; align-items:flex-start; gap:var(--space-4);">
+                    <div style="width:40px; height:40px; border-radius:var(--radius-md); background:var(--primary-50); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                        <i class="bi bi-briefcase-fill" style="color:var(--primary);"></i>
+                    </div>
+                    <div style="flex:1;">
+                        <div style="font-size:var(--text-base); font-weight:700;">{{ job.job_title }}</div>
+                        <div style="display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:var(--space-2);">
+                            {% if job.experience_required %}
+                            <span class="badge badge-neutral">{{ job.experience_required }} exp</span>
+                            {% endif %}
+                            {% if job.package_range %}
+                            <span class="badge badge-success">{{ job.package_range }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <a href="{{ url_for('analysis.index', company_id=selected_company.id) }}" class="btn btn-sm btn-outline-primary">
+                        Check Fit
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state card">
+            <div class="empty-state-icon"><i class="bi bi-briefcase"></i></div>
+            <div class="empty-state-title">No open roles listed</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Process -->
+    {% if selected_company.recruitment_process %}
+    <div data-tab-panel="company-detail" data-tab="process" style="display:none;" class="fade-in">
+        <div class="card">
+            <div class="card-body">
+                <p style="font-size:var(--text-sm); color:var(--text-1); line-height:1.8; white-space:pre-wrap;">{{ selected_company.recruitment_process }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% else %}
+<!-- ── COMPANY LIST VIEW ────────────────────────────────────── -->
+<div class="fade-in-up-delay-1">
+    {% if search_query %}
+    <div style="margin-bottom:var(--space-4);">
+        <span style="font-size:var(--text-sm); color:var(--text-3);">
+            {{ companies|length }} result{% if companies|length != 1 %}s{% endif %} for "<strong>{{ search_query }}</strong>"
+        </span>
+        <a href="{{ url_for('company.index') }}" class="btn btn-ghost btn-sm" style="margin-left:var(--space-3);">
+            <i class="bi bi-x"></i> Clear
+        </a>
+    </div>
+    {% endif %}
+
+    {% if companies %}
+    <div class="grid-auto">
+        {% for co in companies %}
+        <a href="{{ url_for('company.detail', slug=co.slug) }}" class="company-card">
+            <div style="display:flex; align-items:center; gap:var(--space-3); margin-bottom:var(--space-4);">
+                <div class="company-logo" style="background:linear-gradient(135deg, {{ ['#4F46E5','#7C3AED','#0891B2','#059669','#D97706','#DC2626','#0284C7'][loop.index0 % 7] }}, {{ ['#7C3AED','#4F46E5','#7C3AED','#0891B2','#059669','#0284C7','#D97706'][loop.index0 % 7] }});">
+                    {{ co.name[:2].upper() }}
+                </div>
+                <div style="min-width:0; flex:1;">
+                    <div style="font-size:var(--text-base); font-weight:700; color:var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ co.name }}</div>
+                    {% if co.industry %}
+                    <div style="font-size:var(--text-xs); color:var(--text-3);">{{ co.industry }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% if co.location or co.company_size %}
+            <div style="display:flex; flex-wrap:wrap; gap:var(--space-2);">
+                {% if co.location %}
+                <span class="badge badge-neutral" style="font-size:0.65rem;"><i class="bi bi-geo-alt"></i> {{ co.location }}</span>
+                {% endif %}
+                {% if co.company_size %}
+                <span class="badge badge-neutral" style="font-size:0.65rem;"><i class="bi bi-people"></i> {{ co.company_size }}</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state card">
+        <div class="empty-state-icon"><i class="bi bi-building"></i></div>
+        <div class="empty-state-title">No companies found</div>
+        <div class="empty-state-desc">Try a different search term.</div>
+        <a href="{{ url_for('company.index') }}" class="btn btn-primary btn-sm">View All Companies</a>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+</div><!-- stagger-children -->
+{% endblock %}

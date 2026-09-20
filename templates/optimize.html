@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block title %}AI Resume Tailor — AI Career Intelligence Platform{% endblock %}
+{% block page_title %}AI Resume Tailor{% endblock %}
+
+{% block content %}
+<div class="stagger-children" style="max-width: 1000px; margin: 0 auto;">
+
+<!-- Header -->
+<div style="text-align:center; padding:var(--space-6) 0; margin-bottom:var(--space-4);" class="fade-in-up">
+    <div style="display:inline-flex; align-items:center; justify-content:center; width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg, var(--primary), var(--secondary)); color:white; font-size:2rem; margin-bottom:var(--space-3); box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4);">
+        <i class="bi bi-magic"></i>
+    </div>
+    <h1 style="font-size:calc(var(--text-2xl) * 1.2); font-weight:900; margin-bottom:var(--space-2); color:var(--text-1);">AI Resume Tailor</h1>
+    <p style="color:var(--text-3); font-size:var(--text-md); max-width:600px; margin:0 auto;">
+        Instantly rewrite and tailor your resume for a specific job or target company. Let AI enhance your keywords, action verbs, and professional summary.
+    </p>
+</div>
+
+<!-- Form Card -->
+<div class="card fade-in-up-delay-1" style="margin-bottom:var(--space-6); border:none; box-shadow:0 15px 35px rgba(0,0,0,0.05); border-radius: 20px; overflow: visible;">
+    <div class="card-body" style="padding:var(--space-6); background: var(--surface-1); position: relative;">
+        <!-- decorative background -->
+        <div style="position:absolute; top:-20px; right:-20px; width:150px; height:150px; background:radial-gradient(circle, var(--primary-100) 0%, transparent 70%); border-radius:50%; z-index:0; pointer-events:none;"></div>
+        
+        <form action="{{ url_for('optimize.run') }}" method="POST" id="optimizeForm" style="position:relative; z-index:1;">
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:var(--space-5); margin-bottom:var(--space-6);">
+                
+                <!-- Resume Selection -->
+                <div class="form-group">
+                    <label class="form-label" style="font-weight:700; color:var(--text-2); font-size:var(--text-sm); text-transform:uppercase; letter-spacing:0.05em;"><i class="bi bi-1-circle text-primary me-2"></i>Select Resume *</label>
+                    <select class="form-select form-select-lg" name="resume_id" required style="border-radius:12px; border:2px solid var(--border); box-shadow:0 2px 5px rgba(0,0,0,0.02);">
+                        <option value="">— Choose a resume —</option>
+                        {% for r in resumes %}
+                        <option value="{{ r.id }}">{{ r.original_name }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if not resumes %}
+                    <div class="form-text mt-2" style="color:var(--warning); font-weight:500;">
+                        <i class="bi bi-exclamation-circle me-1"></i>
+                        <a href="{{ url_for('resumes.index') }}" style="color:inherit; text-decoration:underline;">Upload a resume first</a>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Target Job Title (NEW) -->
+                <div class="form-group">
+                    <label class="form-label" style="font-weight:700; color:var(--text-2); font-size:var(--text-sm); text-transform:uppercase; letter-spacing:0.05em;"><i class="bi bi-2-circle text-primary me-2"></i>Target Job Title *</label>
+                    <input type="text" class="form-control form-control-lg" name="job_title" placeholder="Enter target job title" required style="border-radius:12px; border:2px solid var(--border); box-shadow:0 2px 5px rgba(0,0,0,0.02);">
+                    <div class="form-text mt-2 text-muted" style="font-size:var(--text-xs);">The specific role you want the resume tailored for.</div>
+                </div>
+
+                <!-- Company Selection -->
+                <div class="form-group">
+                    <label class="form-label" style="font-weight:700; color:var(--text-2); font-size:var(--text-sm); text-transform:uppercase; letter-spacing:0.05em;"><i class="bi bi-3-circle text-primary me-2"></i>Target Company</label>
+                    <select class="form-select form-select-lg" name="company_id" id="companySelect" onchange="handleCompanyToggle(this)" style="border-radius:12px; border:2px solid var(--border); box-shadow:0 2px 5px rgba(0,0,0,0.02);">
+                        <option value="">— No target company —</option>
+                        {% for c in companies %}
+                        <option value="{{ c.id }}">{{ c.name }}</option>
+                        {% endfor %}
+                        <option value="manual">&#9998; Enter manually...</option>
+                    </select>
+                    <div id="manualCompanyWrap" style="display:none; margin-top:var(--space-3);">
+                        <input type="text" class="form-control form-control-lg" name="company_name_manual"
+                            placeholder="Enter target company" style="border-radius:12px; border:2px solid var(--border); box-shadow:0 2px 5px rgba(0,0,0,0.02);">
+                    </div>
+                    <div class="form-text mt-2 text-muted" style="font-size:var(--text-xs);">Optional: Tailor specifically for a company's profile.</div>
+                </div>
+                
+
+                
+            </div>
+            
+            <div style="display:flex; justify-content:center;">
+                <button type="submit" class="btn btn-gradient btn-lg px-5" style="border-radius:50px; font-weight:800; font-size:1.1rem; padding: 1rem 3rem; box-shadow:0 8px 20px rgba(79,70,229,0.3); transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 25px rgba(79,70,229,0.4)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 8px 20px rgba(79,70,229,0.3)';" {% if not resumes %}disabled{% endif %}>
+                    <i class="bi bi-magic me-2"></i> Tailor My Resume Now
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Results Area -->
+<div class="fade-in-up-delay-2">
+{% if optimized %}
+
+    <!-- Score & Overview -->
+    <div class="card" style="margin-bottom:var(--space-6); overflow:hidden; border:none; box-shadow:0 8px 25px rgba(0,0,0,0.05); border-radius: 20px;">
+        <div style="background:linear-gradient(135deg, rgba(79,70,229,0.1) 0%, rgba(16,185,129,0.1) 100%); padding:var(--space-5) var(--space-6); display:flex; align-items:center; gap:var(--space-5); flex-wrap:wrap;">
+            <div data-ring="{{ optimized.improvement_score }}"
+                 data-ring-size="110"
+                 data-ring-color="{{ 'var(--success)' if optimized.improvement_score >= 70 else 'var(--primary)' }}"
+                 data-ring-label="Boost"></div>
+            <div style="flex:1;">
+                <div style="font-size:var(--text-2xl); font-weight:800; margin-bottom:var(--space-2); color:var(--text-1); display:flex; align-items:center; gap:10px;">
+                    Optimization Successful <i class="bi bi-patch-check-fill text-success" style="font-size: 1.5rem;"></i>
+                </div>
+                <div style="color:var(--text-2); font-size:var(--text-md); margin-bottom:var(--space-3);">Your resume has been successfully tailored and rewritten for maximum impact.</div>
+                <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+                    <span class="badge" style="background-color:var(--success-100); color:var(--success-700); padding:0.6em 1.2em; font-size:var(--text-sm); border-radius:30px;"><i class="bi bi-graph-up-arrow me-1"></i> +{{ optimized.improvement_score }}% match improved</span>
+                    {% if optimized.changes_list %}
+                    <span class="badge" style="background-color:var(--primary-50); color:var(--primary-700); padding:0.6em 1.2em; font-size:var(--text-sm); border-radius:30px;"><i class="bi bi-list-stars me-1"></i> {{ optimized.changes_list|length }} strategic changes</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Layout for details: 2 columns -->
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap:var(--space-5); margin-bottom:var(--space-6);">
+        <!-- Summary -->
+        {% if optimized.professional_summary %}
+        <div class="card" style="height:100%; border:none; box-shadow:0 6px 16px rgba(0,0,0,0.04); border-radius:16px;">
+            <div class="card-header" style="background:var(--surface-1); border-bottom:1px solid var(--border); padding:var(--space-4) var(--space-5);">
+                <span class="card-header-title" style="font-weight:800; font-size:var(--text-md);"><i class="bi bi-person-vcard text-primary me-2"></i> Tailored Summary</span>
+                <button onclick="copyToClipboard('{{ optimized.professional_summary | replace("'", "\\'") }}', this)"
+                        class="btn btn-sm btn-light" style="border-radius:8px; font-weight:600;"><i class="bi bi-clipboard me-1"></i> Copy</button>
+            </div>
+            <div class="card-body" style="background:var(--surface-1); padding:var(--space-5);">
+                <p style="font-size:var(--text-md); line-height:1.8; color:var(--text-1); margin:0;">{{ optimized.professional_summary }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Changes -->
+        {% if optimized.changes_list %}
+        <div class="card" style="height:100%; border:none; box-shadow:0 6px 16px rgba(0,0,0,0.04); border-radius:16px;">
+            <div class="card-header" style="background:var(--surface-1); border-bottom:1px solid var(--border); padding:var(--space-4) var(--space-5);">
+                <span class="card-header-title" style="font-weight:800; font-size:var(--text-md);"><i class="bi bi-stars text-warning me-2"></i> Key Enhancements Made</span>
+            </div>
+            <div class="card-body" style="background:var(--surface-1); padding:var(--space-5); display:flex; flex-direction:column; gap:var(--space-3);">
+                {% for change in optimized.changes_list %}
+                <div style="display:flex; align-items:flex-start; gap:var(--space-3); padding:var(--space-3); background:var(--surface-2); border-radius:12px;">
+                    <div style="color:var(--success); margin-top:2px;"><i class="bi bi-check-circle-fill" style="font-size:1.2rem;"></i></div>
+                    <div style="color:var(--text-1); font-size:var(--text-sm); line-height:1.6;">{{ change }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Full Tailored ATS Resume -->
+    <div class="card" style="border:none; box-shadow:0 8px 25px rgba(0,0,0,0.05); border-radius:20px; margin-bottom: var(--space-6);">
+        <div class="card-header" style="background:var(--surface-1); border-bottom:1px solid var(--border); padding:var(--space-4) var(--space-5); display:flex; align-items:center; justify-content:space-between;">
+            <span class="card-header-title" style="font-weight:800; font-size:var(--text-md);">
+                <i class="bi bi-file-earmark-check-fill text-success me-2"></i> Full ATS-Tailored Resume
+                <span class="badge badge-success ms-2" style="font-size: 0.65rem;">Optimized for ATS</span>
+            </span>
+            <div style="display:flex; gap:var(--space-2);">
+                <button id="copyFullResumeBtn" class="btn btn-sm btn-outline-primary" style="border-radius:8px; font-weight:600;"
+                    onclick="copyFullResume()">
+                    <i class="bi bi-clipboard me-1"></i> Copy
+                </button>
+                <button class="btn btn-sm btn-success" style="border-radius:8px; font-weight:600;"
+                    onclick="downloadResume()">
+                    <i class="bi bi-download me-1"></i> Download .txt
+                </button>
+            </div>
+        </div>
+        <div class="card-body" style="background: linear-gradient(135deg, #f0fdf4, #f0f9ff); padding:var(--space-5);">
+            <pre id="fullResumeText" style="font-family: 'Courier New', monospace; font-size:0.88rem; line-height:1.85; color:var(--text-1); white-space:pre-wrap; word-break:break-word; max-height:600px; overflow-y:auto; padding:var(--space-4); background:white; border-radius:12px; border:1px solid rgba(16,185,129,0.2); margin:0;">{{ optimized.optimized_text or '' }}</pre>
+        </div>
+    </div>
+
+    <!-- Before / After Comparison (collapsed) -->
+    <details style="margin-bottom: var(--space-6);">
+        <summary style="cursor:pointer; font-weight:700; font-size:var(--text-md); color:var(--text-2); padding:var(--space-3) var(--space-4); background:var(--surface-2); border-radius:12px; list-style:none; display:flex; align-items:center; gap:var(--space-2);">
+            <i class="bi bi-file-earmark-diff text-primary"></i> Show Original vs Tailored Comparison
+        </summary>
+        <div class="card" style="border:none; box-shadow:0 4px 12px rgba(0,0,0,0.04); border-radius:0 0 16px 16px; margin-top:-4px;">
+            <div class="card-body" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:var(--space-5); background:var(--surface-1); padding:var(--space-5);">
+                <div style="display:flex; flex-direction:column;">
+                    <div style="display:flex; align-items:center; gap:var(--space-2); font-size:var(--text-xs); font-weight:800; color:var(--text-3); margin-bottom:var(--space-3); text-transform:uppercase; letter-spacing:0.05em;">
+                        <i class="bi bi-file-text"></i> Original Text
+                    </div>
+                    <div style="flex:1; font-size:var(--text-sm); color:var(--text-2); line-height:1.8; white-space:pre-wrap; height:400px; overflow-y:auto; padding:var(--space-4); background:var(--surface-2); border-radius:12px; border:1px solid var(--border);">{{ optimized.original_text or 'No original text available' }}</div>
+                </div>
+                <div style="display:flex; flex-direction:column;">
+                    <div style="display:flex; align-items:center; gap:var(--space-2); font-size:var(--text-xs); font-weight:800; color:var(--success-700); margin-bottom:var(--space-3); text-transform:uppercase; letter-spacing:0.05em;">
+                        <i class="bi bi-file-earmark-check-fill"></i> Tailored Text
+                    </div>
+                    <div style="flex:1; font-size:var(--text-sm); color:var(--text-1); line-height:1.8; white-space:pre-wrap; height:400px; overflow-y:auto; padding:var(--space-4); background:var(--success-50); border-radius:12px; border:1px solid rgba(16,185,129,0.2);">{{ optimized.optimized_text or '' }}</div>
+                </div>
+            </div>
+        </div>
+    </details>
+
+
+{% endif %}
+</div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    attachAIFormLoading('optimizeForm', [
+        'Analyzing your current resume…',
+        'Extracting target job requirements…',
+        'Rewriting all resume sections with action verbs…',
+        'Injecting ATS keywords across experience & projects…',
+        'Building professional summary for target role…',
+        'Finalizing your full ATS-optimized resume…'
+    ]);
+});
+
+function handleCompanyToggle(sel) {
+    const wrap = document.getElementById('manualCompanyWrap');
+    if (sel.value === 'manual') {
+        wrap.style.display = 'block';
+        wrap.querySelector('input').focus();
+    } else {
+        wrap.style.display = 'none';
+        wrap.querySelector('input').value = '';
+    }
+}
+
+function copyFullResume() {
+    const el = document.getElementById('fullResumeText');
+    if (!el) return;
+    navigator.clipboard.writeText(el.innerText).then(() => {
+        const btn = document.getElementById('copyFullResumeBtn');
+        if (btn) { btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Copied!'; setTimeout(() => { btn.innerHTML = '<i class="bi bi-clipboard me-1"></i> Copy'; }, 2000); }
+    });
+}
+
+function downloadResume() {
+    const el = document.getElementById('fullResumeText');
+    if (!el) return;
+    const blob = new Blob([el.innerText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ATS_Tailored_Resume.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+</script>
+{% endblock %}
+

@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block title %}Settings — AI Career Intelligence Platform{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div class="stagger-children">
+
+<div style="margin-bottom:var(--space-6);" class="fade-in-up">
+    <h1 style="font-size:var(--text-2xl); font-weight:800; margin-bottom:var(--space-1);">Account Settings</h1>
+    <p style="color:var(--text-3); font-size:var(--text-sm); margin:0;">Manage your password, preferences and account data.</p>
+</div>
+
+<!-- ── TAB NAV ───────────────────────────────────────────── -->
+<div class="nav-tabs-line fade-in-up-delay-1" style="margin-bottom:var(--space-5);" data-tab-group="settings">
+    <button class="tab-btn active" data-tab="security" id="s-tab-security">
+        <i class="bi bi-shield-lock me-1"></i> Security
+    </button>
+    <button class="tab-btn" data-tab="preferences" id="s-tab-preferences">
+        <i class="bi bi-sliders me-1"></i> Preferences
+    </button>
+    <button class="tab-btn" data-tab="danger" id="s-tab-danger">
+        <i class="bi bi-exclamation-triangle me-1"></i> Danger Zone
+    </button>
+</div>
+
+<!-- ── SECURITY TAB ──────────────────────────────────────── -->
+<div data-tab-panel="settings" data-tab="security" class="fade-in-up-delay-2">
+    <!-- Account Info -->
+    <div class="card" style="margin-bottom:var(--space-5);">
+        <div class="card-header">
+            <span class="card-header-title"><i class="bi bi-person-badge text-primary"></i> Account Information</span>
+        </div>
+        <div class="card-body">
+            <div class="info-row">
+                <div class="info-row-label">Full Name</div>
+                <div class="info-row-value">{{ user.full_name or '—' }}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-row-label">Email Address</div>
+                <div class="info-row-value">{{ user.email }}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-row-label">Account Created</div>
+                <div class="info-row-value">{{ user.created_at.strftime('%d %B %Y') if user.created_at else '—' }}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-row-label">Last Login</div>
+                <div class="info-row-value">{{ user.last_login.strftime('%d %b %Y, %H:%M') if user.last_login else '—' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Password -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-header-title"><i class="bi bi-key-fill text-primary"></i> Change Password</span>
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('settings.update_password') }}" method="POST">
+                <div style="max-width:480px; display:flex; flex-direction:column; gap:var(--space-4);">
+                    <div>
+                        <label class="form-label">Current Password</label>
+                        <div class="input-icon-wrap" style="position:relative;">
+                            <i class="bi bi-lock"></i>
+                            <input type="password" class="form-control" name="current_password" required placeholder="Enter current password">
+                            <button type="button" onclick="togglePw(this.previousElementSibling)" style="position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-label">New Password</label>
+                        <div class="input-icon-wrap" style="position:relative;">
+                            <i class="bi bi-lock-fill"></i>
+                            <input type="password" class="form-control" name="new_password" required minlength="6" placeholder="Enter new password (Min. 6 characters)">
+                            <button type="button" onclick="togglePw(this.previousElementSibling)" style="position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-label">Confirm New Password</label>
+                        <div class="input-icon-wrap">
+                            <i class="bi bi-lock-fill"></i>
+                            <input type="password" class="form-control" name="confirm_password" required placeholder="Confirm your new password">
+                        </div>
+                    </div>
+                    <div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check2-all"></i> Update Password
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── PREFERENCES TAB ───────────────────────────────────── -->
+<div data-tab-panel="settings" data-tab="preferences" style="display:none;" class="fade-in">
+    <form action="{{ url_for('settings.update_preferences') }}" method="POST">
+        <div style="display:flex; flex-direction:column; gap:var(--space-5);">
+
+            <!-- Theme -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-header-title"><i class="bi bi-palette-fill text-primary"></i> Appearance</span>
+                </div>
+                <div class="card-body">
+                    <div style="display:flex; gap:var(--space-3);">
+                        {% for theme_id, theme_name, icon in [('light','Light','bi-sun-fill'),('dark','Dark','bi-moon-stars-fill'),('system','System','bi-display')] %}
+                        <label style="flex:1; border:2px solid {{ 'var(--primary)' if (settings and settings.theme == theme_id) or (not settings and theme_id == 'light') else 'var(--border)' }}; border-radius:var(--radius-md); padding:var(--space-4); text-align:center; cursor:pointer; transition:border-color var(--transition-fast);"
+                               onclick="highlightTheme('{{ theme_id }}', this)">
+                            <input type="radio" name="theme" value="{{ theme_id }}" style="display:none;"
+                                   id="theme_{{ theme_id }}"
+                                   {{ 'checked' if (settings and settings.theme == theme_id) or (not settings and theme_id == 'light') }}>
+                            <i class="bi {{ icon }}" style="font-size:1.5rem; color:var(--primary); display:block; margin-bottom:var(--space-2);"></i>
+                            <div style="font-size:var(--text-sm); font-weight:600;">{{ theme_name }}</div>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notifications -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-header-title"><i class="bi bi-bell-fill text-primary"></i> Notifications</span>
+                </div>
+                <div class="card-body" style="display:flex; flex-direction:column; gap:var(--space-4);">
+                    {% set notif_opts = [
+                        ('email_notifications', 'Email Notifications', 'Receive email alerts for important events', 'bi-envelope-fill'),
+                        ('placement_alerts', 'Placement Alerts', 'Get notified about new placement opportunities', 'bi-building-fill'),
+                        ('weekly_report', 'Weekly Progress Report', 'Receive a weekly PDF summary of your career progress', 'bi-file-bar-graph-fill'),
+                    ] %}
+                    {% for field, label, desc, icon in notif_opts %}
+                    {% set checked = settings and settings[field] %}
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:var(--space-4);">
+                        <div style="display:flex; align-items:center; gap:var(--space-3);">
+                            <div style="width:36px; height:36px; border-radius:var(--radius-sm); background:var(--primary-50); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                                <i class="bi {{ icon }}" style="color:var(--primary);"></i>
+                            </div>
+                            <div>
+                                <div style="font-size:var(--text-sm); font-weight:600; color:var(--text-1);">{{ label }}</div>
+                                <div style="font-size:var(--text-xs); color:var(--text-3);">{{ desc }}</div>
+                            </div>
+                        </div>
+                        <!-- Toggle Switch -->
+                        <label style="position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; cursor:pointer;">
+                            <input type="checkbox" name="{{ field }}" id="{{ field }}"
+                                   style="opacity:0; width:0; height:0; position:absolute;"
+                                   {{ 'checked' if checked }}>
+                            <span onclick="this.previousElementSibling.checked=!this.previousElementSibling.checked; this.style.background=this.previousElementSibling.checked?'var(--primary)':'var(--surface-3)';"
+                                  style="position:absolute; inset:0; border-radius:100px; background:{{ 'var(--primary)' if checked else 'var(--surface-3)' }}; transition:background 0.2s; cursor:pointer;">
+                                <span style="position:absolute; height:16px; width:16px; left:4px; bottom:4px; background:white; border-radius:50%; transition:transform 0.2s; transform:{{ 'translateX(20px)' if checked else 'none' }};" id="knob-{{ field }}"></span>
+                            </span>
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end;">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check2"></i> Save Preferences
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- ── DANGER ZONE TAB ───────────────────────────────────── -->
+<div data-tab-panel="settings" data-tab="danger" style="display:none;" class="fade-in">
+    <div class="card" style="border-color:var(--danger-100);">
+        <div class="card-header" style="background:var(--danger-100);">
+            <span class="card-header-title" style="color:var(--danger);">
+                <i class="bi bi-exclamation-triangle-fill"></i> Danger Zone
+            </span>
+        </div>
+        <div class="card-body">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-4); flex-wrap:wrap; padding:var(--space-4); border:1px solid var(--danger-100); border-radius:var(--radius-md);">
+                <div>
+                    <div style="font-size:var(--text-base); font-weight:700; color:var(--danger); margin-bottom:var(--space-1);">Delete Account</div>
+                    <div style="font-size:var(--text-sm); color:var(--text-2); max-width:400px; line-height:1.6;">
+                        Once deleted, your account and all associated data — resumes, analyses, roadmaps, reports — will be permanently removed. This action cannot be undone.
+                    </div>
+                </div>
+                <button class="btn btn-sm" style="background:var(--danger); color:white;"
+                        onclick="document.getElementById('deleteAccountModal').style.display='flex'">
+                    <i class="bi bi-trash3-fill"></i> Delete My Account
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Account Modal -->
+<div id="deleteAccountModal" class="ai-loading-overlay" style="display:none; align-items:center; justify-content:center;">
+    <div class="ai-loading-card" style="text-align:center; max-width:440px;">
+        <div style="font-size:3rem; margin-bottom:var(--space-4);">⚠️</div>
+        <div style="font-size:var(--text-xl); font-weight:800; color:var(--danger); margin-bottom:var(--space-2);">Delete Account?</div>
+        <p style="font-size:var(--text-sm); color:var(--text-2); margin-bottom:var(--space-5);">
+            This will permanently delete your account and all your data. Please enter your password to confirm.
+        </p>
+        <form action="{{ url_for('settings.delete_account') }}" method="POST">
+            <div style="margin-bottom:var(--space-4);">
+                <input type="password" class="form-control" name="confirm_password" required placeholder="Enter your password to confirm">
+            </div>
+            <div style="display:flex; gap:var(--space-3);">
+                <button type="button" class="btn btn-secondary" style="flex:1;" onclick="document.getElementById('deleteAccountModal').style.display='none'">Cancel</button>
+                <button type="submit" class="btn" style="flex:1; background:var(--danger); color:white;">Delete Forever</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+</div><!-- stagger -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+function togglePw(input) {
+    const btn = input.nextElementSibling;
+    const icon = btn?.querySelector('i');
+    input.type = input.type === 'password' ? 'text' : 'password';
+    if (icon) icon.className = input.type === 'text' ? 'bi bi-eye-slash' : 'bi bi-eye';
+}
+function highlightTheme(id, label) {
+    document.querySelectorAll('[name="theme"]').forEach(r => {
+        const lbl = r.closest('label');
+        if (lbl) lbl.style.borderColor = 'var(--border)';
+    });
+    label.style.borderColor = 'var(--primary)';
+}
+</script>
+{% endblock %}

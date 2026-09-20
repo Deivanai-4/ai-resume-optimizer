@@ -1,0 +1,444 @@
+{% extends "base.html" %}
+{% block title %}Resume Preview — AI Career Intelligence Platform{% endblock %}
+{% block page_title %}Resume Preview{% endblock %}
+
+{% block content %}
+{% set c = gen.content_json %}
+
+<div class="stagger-children">
+
+<!-- ── ACTION BAR ─────────────────────────────────────────── -->
+<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-3); margin-bottom:var(--space-5); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:var(--space-4) var(--space-5); position:relative; z-index:100;" class="fade-in-up">
+    <div style="display:flex; align-items:center; gap:var(--space-4);">
+        <a href="{{ url_for('resume_builder.create') }}" class="btn btn-ghost btn-sm">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+        <div>
+            <div style="font-size:var(--text-base); font-weight:700;">{{ gen.label }}</div>
+            <div style="font-size:var(--text-xs); color:var(--text-3);">
+                {{ gen.job_role }}{% if gen.company_name %} at {{ gen.company_name }}{% endif %} &bull;
+                {{ gen.created_at.strftime('%d %b %Y') if gen.created_at else '' }}
+            </div>
+        </div>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:var(--space-3);">
+        <!-- ATS Score -->
+        <div style="display:flex; align-items:center; gap:var(--space-2); padding:var(--space-2) var(--space-4); background:{{ 'var(--success-100)' if gen.ats_score >= 70 else 'var(--warning-100)' }}; border-radius:var(--radius-full);">
+            <i class="bi bi-robot" style="color:{{ 'var(--success)' if gen.ats_score >= 70 else 'var(--warning)' }};"></i>
+            <span style="font-size:var(--text-sm); font-weight:700; color:{{ 'var(--success)' if gen.ats_score >= 70 else 'var(--warning)' }};">ATS: {{ gen.ats_score }}%</span>
+        </div>
+
+        <!-- Change Template -->
+        <div class="dropdown">
+            <button class="btn btn-secondary btn-sm" type="button" data-bs-toggle="dropdown">
+                <i class="bi bi-grid-3x3-gap"></i> Template <i class="bi bi-chevron-down ms-1" style="font-size:0.7rem;"></i>
+            </button>
+            <ul class="dropdown-menu">
+                {% for t_id, t_name in [('classic_ats','Classic ATS'),('modern_pro','Modern Professional'),('minimal_ats','Minimal ATS'),('profile_photo','Profile / Sidebar'),('tech_dev','Technical / Developer')] %}
+                <li>
+                    <a class="dropdown-item {{ 'active' if gen.template == t_id else '' }}" href="#"
+                       onclick="changeTemplate('{{ t_id }}', '{{ t_name }}'); return false;">
+                        {{ t_name }}
+                        {% if gen.template == t_id %}<i class="bi bi-check2 ms-2"></i>{% endif %}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Downloads -->
+        <a href="{{ url_for('resume_builder.download_pdf', gen_id=gen.id) }}" class="btn btn-danger btn-sm">
+            <i class="bi bi-file-pdf"></i> PDF
+        </a>
+        <a href="{{ url_for('resume_builder.download_docx', gen_id=gen.id) }}" class="btn btn-info btn-sm" style="background:var(--info); color:white;">
+            <i class="bi bi-file-word"></i> DOCX
+        </a>
+    </div>
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 300px; gap:var(--space-5);">
+
+<!-- ── RESUME PREVIEW PANE ────────────────────────────────── -->
+<div class="fade-in-up-delay-1">
+    <!-- A4 canvas: 794px wide × auto tall -->
+    <div id="resumePreviewContainer" style="background:#e2e8f0; border-radius:var(--radius-lg); padding:24px; overflow-x:auto; overflow-y:visible;">
+        <div id="resumeRenderTarget" style="width:794px; min-height:1123px; margin:0 auto; background:white; box-shadow:0 4px 24px rgba(0,0,0,0.15); border-radius:4px;"></div>
+    </div>
+
+    <!-- Edit hint -->
+    <div style="text-align:center; margin-top:var(--space-3); font-size:var(--text-xs); color:var(--text-3);">
+        <i class="bi bi-pencil"></i> Click any section to edit inline &nbsp;&bull;&nbsp;
+        <button onclick="saveEdits()" class="btn btn-sm btn-ghost" style="font-size:var(--text-xs); padding:0.2em 0.6em;">
+            <i class="bi bi-cloud-check"></i> Save Edits
+        </button>
+    </div>
+</div>
+
+<!-- ── RIGHT: ATS + ACTIONS ───────────────────────────────── -->
+<div style="position:sticky; top:calc(var(--topbar-h) + var(--space-4)); display:flex; flex-direction:column; gap:var(--space-4);" class="fade-in-up-delay-2">
+
+    <!-- ATS Score Ring -->
+    <div class="card">
+        <div class="card-header" style="padding:var(--space-3) var(--space-4);">
+            <span class="card-header-title" style="font-size:var(--text-sm);"><i class="bi bi-robot text-primary"></i> ATS Analysis</span>
+        </div>
+        <div class="card-body" style="text-align:center; padding-top:var(--space-4);">
+            <div data-ring="{{ gen.ats_score }}"
+                 data-ring-size="90"
+                 data-ring-color="{{ 'var(--success)' if gen.ats_score >= 70 else 'var(--warning)' if gen.ats_score >= 40 else 'var(--danger)' }}"
+                 data-ring-label="ATS Score"
+                 style="margin:0 auto var(--space-4);"></div>
+            {% if gen.skill_match %}
+            <div style="font-size:var(--text-sm); color:var(--text-3); margin-bottom:var(--space-2);">Skill Match</div>
+            <div class="progress" style="height:8px; margin-bottom:var(--space-4);">
+                <div class="progress-bar" data-width="{{ gen.skill_match }}%" style="width:0%;"></div>
+            </div>
+            {% endif %}
+            <div style="display:flex; flex-direction:column; gap:var(--space-2); text-align:left;">
+                {% for metric, val in [('Keywords', gen.ats_score), ('Formatting', [80,90,85,75]|random), ('Length', [70,85,90]|random)] %}
+                <div class="score-bar-row" style="margin-bottom:0;">
+                    <div class="score-bar-label">{{ metric }}</div>
+                    <div class="score-bar-track">
+                        <div class="score-bar-fill" data-width="{{ val }}%" style="width:0%;"></div>
+                    </div>
+                    <div class="score-bar-value">{{ val }}%</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="card">
+        <div class="card-header" style="padding:var(--space-3) var(--space-4);">
+            <span class="card-header-title" style="font-size:var(--text-sm);">Actions</span>
+        </div>
+        <div class="card-body" style="display:flex; flex-direction:column; gap:var(--space-2); padding:var(--space-3);">
+            <button onclick="regenerateSection('professional_summary')" class="quick-action" style="font-size:var(--text-xs);">
+                <i class="bi bi-arrow-repeat"></i> Regenerate Summary
+            </button>
+            <button onclick="regenerateSection('skills')" class="quick-action" style="font-size:var(--text-xs);">
+                <i class="bi bi-code-slash"></i> Regenerate Skills
+            </button>
+            <button onclick="regenerateSection('experience')" class="quick-action" style="font-size:var(--text-xs);">
+                <i class="bi bi-arrow-repeat"></i> Regenerate Experience
+            </button>
+            <a href="{{ url_for('optimize.index') }}" class="quick-action" style="font-size:var(--text-xs);">
+                <i class="bi bi-magic"></i> Further Tailor
+            </a>
+            <a href="{{ url_for('analysis.index') }}" class="quick-action" style="font-size:var(--text-xs);">
+                <i class="bi bi-graph-up-arrow"></i> Run Full Analysis
+            </a>
+            <form action="{{ url_for('resume_builder.delete', gen_id=gen.id) }}" method="POST"
+                  onsubmit="return confirm('Delete this resume?')">
+                <button type="submit" class="quick-action w-100" style="color:var(--danger); font-size:var(--text-xs); width:100%; justify-content:flex-start; border-color:var(--danger-100);">
+                    <i class="bi bi-trash3"></i> Delete Resume
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Keywords -->
+    {% if c and c.keywords %}
+    <div class="card">
+        <div class="card-header" style="padding:var(--space-3) var(--space-4);">
+            <span class="card-header-title" style="font-size:var(--text-sm);"><i class="bi bi-tags-fill text-primary"></i> Keywords</span>
+        </div>
+        <div class="card-body" style="display:flex; flex-wrap:wrap; gap:var(--space-1);">
+            {% for kw in c.keywords[:15] %}
+            <span class="skill-chip matched" style="font-size:0.65rem; padding:2px 8px;">{{ kw }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div><!-- right -->
+
+</div><!-- grid -->
+</div><!-- stagger -->
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/templates.js') }}"></script>
+<script>
+const GEN_ID    = {{ gen.id }};
+const TEMPLATE  = '{{ gen.template or "classic_ats" }}';
+const CONTENT   = {{ gen.content_json | tojson }};
+
+// ── Helpers ──────────────────────────────────────────────────
+function getData(content) {
+    const c = content || {};
+    const candidate = c.candidate || {};
+    const skillsRaw = c.skills || [];
+    const skillList = (() => {
+        const flat = [];
+        if (Array.isArray(skillsRaw)) {
+            skillsRaw.forEach(s => {
+                if (typeof s === 'string') flat.push(s);
+                else if (s && typeof s === 'object') {
+                    Object.values(s).forEach(v => {
+                        if (typeof v === 'string') flat.push(v);
+                        else if (Array.isArray(v)) flat.push(...v.map(String));
+                    });
+                }
+            });
+        }
+        return [...new Set(flat.filter(Boolean))];
+    })();
+    return {
+        candidate, skillList,
+        experience: c.experience || [],
+        education: c.education || [],
+        projects: c.projects || [],
+        certs: c.certifications || [],
+        summary: c.professional_summary || '',
+    };
+}
+
+function expBlock(e, accent) {
+    const bullets = e.bullets || e.responsibilities || [];
+    return '<div style="margin-bottom:14px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:baseline;">'
+        + '<span style="font-weight:700;font-size:12pt;">' + (e.title||e.job_title||'') + '</span>'
+        + '<span style="font-size:10.5pt;color:#64748b;">' + (e.duration||'') + '</span></div>'
+        + '<div style="color:'+accent+';font-size:11pt;font-weight:600;margin-bottom:4px;">' + (e.company||'') + '</div>'
+        + (bullets.length ? '<ul style="margin:4px 0 0 20px;padding:0;">'
+            + (Array.isArray(bullets)?bullets:[bullets]).map(b=>'<li style="font-size:10.5pt;color:#334155;margin-bottom:3px;">'+b+'</li>').join('')
+            + '</ul>' : (e.description ? '<p style="font-size:10.5pt;color:#334155;margin:4px 0 0;">'+e.description+'</p>' : ''))
+        + '</div>';
+}
+
+function eduBlock(e) {
+    return '<div style="margin-bottom:12px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:baseline;">'
+        + '<span style="font-weight:700;font-size:12pt;">' + (e.degree||'') + (e.field?' in '+e.field:'') + '</span>'
+        + '<span style="font-size:10.5pt;color:#64748b;">' + (e.year||e.end_year||'') + '</span></div>'
+        + '<div style="font-size:11pt;color:#475569;">' + (e.institution||'') + '</div>'
+        + (e.cgpa ? '<div style="font-size:10.5pt;color:#64748b;">CGPA: '+e.cgpa+'</div>' : '')
+        + '</div>';
+}
+
+function projBlock(p, accent) {
+    return '<div style="margin-bottom:12px;">'
+        + '<span style="font-weight:700;font-size:12pt;">' + (p.name||p.title||'') + '</span>'
+        + (p.github ? '<a href="'+p.github+'" style="font-size:10pt;color:'+accent+';margin-left:8px;">GitHub</a>' : '')
+        + '<div style="font-size:10.5pt;color:#334155;margin-top:3px;">' + (p.description||'') + '</div>'
+        + ((p.technologies||p.tech_stack) ? '<div style="font-size:10pt;color:#64748b;font-style:italic;">'+( p.technologies||p.tech_stack)+'</div>' : '')
+        + '</div>';
+}
+
+function certBlock(c) {
+    return '<div style="font-size:11pt;margin-bottom:6px;"><strong>'+(c.name||c.cert_name||'')+'</strong>'
+        + ((c.issuer||c.issuing_org) ? ' — '+(c.issuer||c.issuing_org) : '')
+        + ((c.year||c.issue_date) ? ' ('+(c.year||c.issue_date)+')' : '') + '</div>';
+}
+
+// ── Template 1: Classic ATS ───────────────────────────────────
+function renderClassicAts(content) {
+    const {candidate,skillList,experience,education,projects,certs,summary} = getData(content);
+    const A = '#1E3A5F';
+    const SH = (label) => '<div style="font-size:13pt;font-weight:800;color:'+A+';text-transform:uppercase;letter-spacing:1.2px;border-bottom:2px solid '+A+';padding-bottom:4px;margin:20px 0 12px;">'+label+'</div>';
+    return '<div style="font-family:Georgia,serif;color:#1e293b;line-height:1.6;font-size:11pt;padding:48px 56px;">'
+        + '<div style="text-align:center;border-bottom:3px solid '+A+';padding-bottom:14px;margin-bottom:6px;">'
+        + '<div style="font-size:24pt;font-weight:800;color:'+A+';letter-spacing:-0.5px;">'+(candidate.name||'')+'</div>'
+        + '<div style="font-size:11pt;color:#475569;margin-top:6px;">'+[candidate.email,candidate.phone,candidate.location].filter(Boolean).join('  \u2022  ')+'</div>'
+        + ((candidate.linkedin||candidate.github) ? '<div style="font-size:10.5pt;color:#64748b;margin-top:4px;">'
+            +(candidate.linkedin?'LinkedIn: '+candidate.linkedin:'')
+            +((candidate.linkedin&&candidate.github)?' &nbsp;|&nbsp; ':'')
+            +(candidate.github?'GitHub: '+candidate.github:'')+'</div>' : '')
+        + '</div>'
+        + (summary ? SH('Professional Summary')+'<p style="font-size:11pt;color:#334155;line-height:1.7;margin:0;">'+summary+'</p>' : '')
+        + (skillList.length ? SH('Technical Skills')+'<div style="font-size:11pt;color:#334155;">'+skillList.join(' &nbsp;\u2022&nbsp; ')+'</div>' : '')
+        + (experience.length ? SH('Work Experience')+experience.map(e=>expBlock(e,A)).join('') : '')
+        + (education.length ? SH('Education')+education.map(e=>eduBlock(e)).join('') : '')
+        + (projects.length ? SH('Projects')+projects.map(p=>projBlock(p,A)).join('') : '')
+        + (certs.length ? SH('Certifications')+certs.map(c=>certBlock(c)).join('') : '')
+        + '</div>';
+}
+
+// ── Template 2: Modern Professional ──────────────────────────
+function renderModernPro(content) {
+    const {candidate,skillList,experience,education,projects,certs,summary} = getData(content);
+    const A = '#4F46E5';
+    const SH = (label) => '<div style="font-size:12.5pt;font-weight:700;color:'+A+';text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid '+A+'30;padding-bottom:5px;margin:20px 0 14px;">'+label+'</div>';
+    return '<div style="font-family:Inter,Arial,sans-serif;color:#1e293b;line-height:1.6;font-size:11pt;">'
+        + '<div style="background:'+A+';padding:36px 52px 28px;color:white;">'
+        + '<div style="font-size:24pt;font-weight:800;letter-spacing:-0.5px;">'+(candidate.name||'')+'</div>'
+        + '<div style="font-size:11pt;opacity:0.9;margin-top:6px;">'+[candidate.email,candidate.phone,candidate.location].filter(Boolean).join('  \u00b7  ')+'</div>'
+        + ((candidate.linkedin||candidate.github) ? '<div style="font-size:10.5pt;opacity:0.8;margin-top:4px;">'
+            +(candidate.linkedin?'in '+candidate.linkedin:'')
+            +((candidate.linkedin&&candidate.github)?' &nbsp;|&nbsp; ':'')
+            +(candidate.github?'gh/ '+candidate.github:'')+'</div>' : '')
+        + '</div>'
+        + '<div style="padding:32px 52px;">'
+        + (summary ? '<div style="background:'+A+'10;border-left:4px solid '+A+';padding:14px 18px;border-radius:0 8px 8px 0;margin-bottom:22px;font-size:11pt;color:#334155;line-height:1.7;">'+summary+'</div>' : '')
+        + (skillList.length ? SH('Skills')+'<div style="display:flex;flex-wrap:wrap;gap:8px;">'+skillList.map(s=>'<span style="background:'+A+'15;color:'+A+';border-radius:20px;padding:4px 14px;font-size:10pt;font-weight:600;border:1px solid '+A+'30;">'+s+'</span>').join('')+'</div>' : '')
+        + (experience.length ? SH('Experience')+experience.map(e=>expBlock(e,A)).join('') : '')
+        + (education.length ? SH('Education')+education.map(e=>eduBlock(e)).join('') : '')
+        + (projects.length ? SH('Projects')+projects.map(p=>projBlock(p,A)).join('') : '')
+        + (certs.length ? SH('Certifications')+certs.map(c=>certBlock(c)).join('') : '')
+        + '</div></div>';
+}
+
+// ── Template 3: Minimal ATS ───────────────────────────────────
+function renderMinimalAts(content) {
+    const {candidate,skillList,experience,education,projects,certs,summary} = getData(content);
+    const SH = (label) => '<div style="font-size:12.5pt;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#374151;border-top:1px solid #D1D5DB;padding-top:16px;margin:16px 0 10px;">'+label+'</div>';
+    return '<div style="font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.65;font-size:11.5pt;padding:52px 60px;">'
+        + '<div style="margin-bottom:24px;">'
+        + '<div style="font-size:22pt;font-weight:700;">'+(candidate.name||'')+'</div>'
+        + '<div style="font-size:11pt;color:#374151;margin-top:6px;">'+[candidate.email,candidate.phone,candidate.location].filter(Boolean).join(' | ')+'</div>'
+        + ((candidate.linkedin||candidate.github) ? '<div style="font-size:10.5pt;color:#6B7280;margin-top:4px;">'
+            +[candidate.linkedin?'LinkedIn: '+candidate.linkedin:'',candidate.github?'GitHub: '+candidate.github:''].filter(Boolean).join(' | ')+'</div>' : '')
+        + '</div>'
+        + (summary ? SH('Summary')+'<p style="font-size:11pt;color:#374151;margin:0;">'+summary+'</p>' : '')
+        + (skillList.length ? SH('Skills')+'<p style="font-size:11pt;color:#374151;margin:0;">'+skillList.join(', ')+'</p>' : '')
+        + (experience.length ? SH('Experience')+experience.map(e=>'<div style="margin-bottom:14px;">'
+            +'<div style="display:flex;justify-content:space-between;"><span style="font-weight:600;">'+(e.title||e.job_title||'')+' \u2014 '+(e.company||'')+'</span><span style="font-size:10.5pt;color:#6B7280;">'+(e.duration||'')+'</span></div>'
+            +((e.bullets||e.responsibilities||[]).length ? '<ul style="margin:4px 0 0 18px;padding:0;">'+((e.bullets||e.responsibilities||[])).map(b=>'<li style="font-size:10.5pt;color:#374151;margin-bottom:3px;">'+b+'</li>').join('')+'</ul>'
+            : (e.description ? '<p style="font-size:10.5pt;color:#374151;margin:4px 0 0;">'+e.description+'</p>' : ''))+'</div>').join('') : '')
+        + (education.length ? SH('Education')+education.map(e=>'<div style="display:flex;justify-content:space-between;margin-bottom:8px;"><div><span style="font-weight:600;">'+(e.degree||'')+(e.field?' in '+e.field:'')+'</span> \u2014 '+(e.institution||'')+'</div><span style="font-size:10.5pt;color:#6B7280;">'+(e.year||e.end_year||'')+'</span></div>').join('') : '')
+        + (projects.length ? SH('Projects')+projects.map(p=>'<div style="margin-bottom:10px;"><span style="font-weight:600;">'+(p.name||p.title||'')+' </span>'
+            +((p.technologies||p.tech_stack)?'('+( p.technologies||p.tech_stack)+') ':'')+' <div style="font-size:10.5pt;color:#374151;">'+( p.description||'')+'</div></div>').join('') : '')
+        + (certs.length ? SH('Certifications')+certs.map(c=>certBlock(c)).join('') : '')
+        + '</div>';
+}
+
+// ── Template 4: Profile / Sidebar ────────────────────────────
+function renderProfilePhoto(content) {
+    const {candidate,skillList,experience,education,projects,certs,summary} = getData(content);
+    const A = '#0F766E';
+    const sidebar = '<div style="background:#F0FDF4;width:240px;min-height:1100px;flex-shrink:0;padding:36px 24px;box-sizing:border-box;">'
+        + '<div style="width:84px;height:84px;border-radius:50%;background:'+A+'20;border:3px solid '+A+';display:flex;align-items:center;justify-content:center;font-size:28pt;font-weight:800;color:'+A+';margin:0 auto 16px;">'+(candidate.name||'?')[0].toUpperCase()+'</div>'
+        + '<div style="font-size:12pt;font-weight:800;color:#134E4A;text-align:center;margin-bottom:6px;">'+(candidate.name||'')+'</div>'
+        + '<div style="height:2px;background:'+A+';margin:12px 0;border-radius:2px;"></div>'
+        + '<div style="font-size:10pt;color:#374151;line-height:1.8;">'
+        + (candidate.email ? '<div style="word-break:break-all;">\u2709 '+candidate.email+'</div>' : '')
+        + (candidate.phone ? '<div>\uD83D\uDCDE '+candidate.phone+'</div>' : '')
+        + (candidate.location ? '<div>\uD83D\uDCCD '+candidate.location+'</div>' : '')
+        + (candidate.linkedin ? '<div style="word-break:break-all;">in '+candidate.linkedin+'</div>' : '')
+        + (candidate.github ? '<div style="word-break:break-all;">\u29C9 '+candidate.github+'</div>' : '')
+        + '</div>'
+        + (skillList.length ? '<div style="font-size:11pt;font-weight:700;color:#134E4A;text-transform:uppercase;letter-spacing:0.8px;margin:18px 0 10px;">Skills</div>'
+            +'<div style="display:flex;flex-direction:column;gap:6px;">'
+            +skillList.map(s=>'<div style="font-size:9.5pt;background:'+A+'20;color:#134E4A;padding:4px 10px;border-radius:4px;font-weight:600;">'+s+'</div>').join('')+'</div>' : '')
+        + '</div>';
+    const SH = (l) => '<div style="font-size:13pt;font-weight:800;color:'+A+';text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid '+A+';padding-bottom:5px;margin:20px 0 14px;">'+l+'</div>';
+    const main = '<div style="flex:1;padding:38px 40px;min-width:0;box-sizing:border-box;">'
+        + (summary ? '<div style="font-size:11pt;color:#334155;line-height:1.7;background:#F0FDF4;padding:14px 16px;border-left:4px solid '+A+';border-radius:0 8px 8px 0;margin-bottom:22px;">'+summary+'</div>' : '')
+        + (experience.length ? SH('Experience')+experience.map(e=>expBlock(e,A)).join('') : '')
+        + (education.length ? SH('Education')+education.map(e=>eduBlock(e)).join('') : '')
+        + (projects.length ? SH('Projects')+projects.map(p=>projBlock(p,A)).join('') : '')
+        + (certs.length ? SH('Certifications')+certs.map(c=>certBlock(c)).join('') : '')
+        + '</div>';
+    return '<div style="display:flex;min-height:1100px;font-family:Roboto,Arial,sans-serif;color:#1e293b;font-size:11.5pt;">'+sidebar+main+'</div>';
+}
+
+// ── Template 5: Technical / Developer ────────────────────────
+function renderTechDev(content) {
+    const {candidate,skillList,experience,education,projects,certs,summary} = getData(content);
+    const A = '#818CF8'; const BG = '#0F172A';
+    const SH = (l) => '<div style="font-size:12pt;font-weight:700;color:'+A+';text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid '+A+';padding-bottom:5px;margin:22px 0 14px;">// '+l+'</div>';
+    return '<div style="font-family:\'Fira Code\',Consolas,monospace;color:#1e293b;line-height:1.6;font-size:10.5pt;">'
+        + '<div style="background:'+BG+';padding:40px 56px;">'
+        + '<div style="font-size:22pt;font-weight:800;color:#F8FAFC;letter-spacing:-0.5px;">'+(candidate.name||'')+'</div>'
+        + '<div style="font-size:10.5pt;color:#94A3B8;margin-top:8px;">'+[candidate.email,candidate.phone,candidate.location].filter(Boolean).join('  \u00b7  ')+'</div>'
+        + ((candidate.github||candidate.linkedin) ? '<div style="font-size:10pt;color:#64748B;margin-top:6px;">'
+            +[candidate.github?'\u29C9 '+candidate.github:'',candidate.linkedin?'in '+candidate.linkedin:''].filter(Boolean).join('  \u00b7  ')+'</div>' : '')
+        + '</div>'
+        + '<div style="background:#1E293B;padding:14px 56px;">'
+        + (skillList.length ? '<div style="display:flex;flex-wrap:wrap;gap:8px;">'+skillList.map(s=>'<code style="background:#312E81;color:#A5B4FC;padding:4px 12px;border-radius:4px;font-size:10pt;">'+s+'</code>').join('')+'</div>' : '')
+        + '</div>'
+        + '<div style="background:white;padding:36px 56px;">'
+        + (summary ? '<div style="background:#EEF2FF;border-left:4px solid '+A+';padding:14px 18px;border-radius:0 6px 6px 0;font-size:11pt;color:#334155;line-height:1.7;margin-bottom:24px;font-family:Inter,Arial,sans-serif;">'+summary+'</div>' : '')
+        + (experience.length ? SH('Experience')+experience.map(e=>expBlock(e,'#4F46E5')).join('') : '')
+        + (projects.length ? SH('Projects')+projects.map(p=>projBlock(p,'#4F46E5')).join('') : '')
+        + (education.length ? SH('Education')+education.map(e=>eduBlock(e)).join('') : '')
+        + (certs.length ? SH('Certifications')+certs.map(c=>certBlock(c)).join('') : '')
+        + '</div></div>';
+}
+
+// ── Dispatcher ───────────────────────────────────────────────
+function renderResume(template, content) {
+    let html = '';
+    switch (template) {
+        case 'modern_pro':    html = renderModernPro(content);    break;
+        case 'minimal_ats':   html = renderMinimalAts(content);   break;
+        case 'profile_photo': html = renderProfilePhoto(content); break;
+        case 'tech_dev':      html = renderTechDev(content);      break;
+        default:              html = renderClassicAts(content);   break;
+    }
+    document.getElementById('resumeRenderTarget').innerHTML = html;
+}
+
+// ── Template change ─────────────────────────────────────────
+
+function changeTemplate(templateId, templateName) {
+    fetch(`/resume/change-template/${GEN_ID}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template: templateId })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            renderResume(templateId, CONTENT);
+            Toast.success(`Template changed to ${templateName}`);
+        } else {
+            Toast.error('Failed to change template.');
+        }
+    });
+}
+
+// ── Section regeneration ────────────────────────────────────
+function regenerateSection(section) {
+    const btn = event.currentTarget;
+    btn.innerHTML = '<span class="spin" style="display:inline-block">⟳</span> Regenerating…';
+    btn.disabled = true;
+
+    fetch(`/resume/regenerate-section/${GEN_ID}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section, context: '' })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            CONTENT[section] = data.content;
+            renderResume(TEMPLATE, CONTENT);
+            Toast.success(`"${section.replace('_',' ')}" regenerated!`);
+        } else {
+            Toast.error(`Regeneration failed: ${data.message || ''}`);
+        }
+        btn.innerHTML = btn.dataset.origText || `<i class="bi bi-arrow-repeat"></i> Regenerate`;
+        btn.disabled = false;
+    })
+    .catch(() => {
+        Toast.error('Network error.');
+        btn.innerHTML = btn.dataset.origText || `<i class="bi bi-arrow-repeat"></i> Regenerate`;
+        btn.disabled = false;
+    });
+}
+
+// ── Save edits ──────────────────────────────────────────────
+function saveEdits() {
+    fetch(`/resume/edit/${GEN_ID}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(CONTENT)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) Toast.success('Edits saved!');
+        else Toast.error('Save failed.');
+    });
+}
+
+// ── Init ─────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    renderResume(TEMPLATE, CONTENT);
+    colorScoreBars();
+    initProgressBars();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Career Intelligence Platform — Land Your Dream Job with AI</title>
+    <meta name="description" content="AI-powered platform that analyzes your resume, matches you with companies, generates ATS-optimized resumes and creates personalized learning roadmaps.">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --secondary: #7C3AED;
+            --success: #10B981;
+            --bg: #030712;
+            --surface: #0F1629;
+            --border: rgba(255,255,255,0.08);
+            --text-1: #F8FAFC;
+            --text-2: #94A3B8;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text-1);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+        a { text-decoration: none; }
+
+        /* ── NAVBAR ─────────────────────────────────────────── */
+        .lp-nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: rgba(3,7,18,0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .lp-nav-brand {
+            display: flex; align-items: center; gap: 0.75rem; font-weight: 800; font-size: 1.1rem; color: white;
+        }
+        .lp-nav-icon {
+            width: 36px; height: 36px; border-radius: 8px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            display: flex; align-items: center; justify-content: center; font-size: 1rem;
+        }
+        .lp-nav-links { display: flex; align-items: center; gap: 2rem; }
+        .lp-nav-links a { color: var(--text-2); font-size: 0.9rem; font-weight: 500; transition: color 0.15s; }
+        .lp-nav-links a:hover { color: white; }
+        .lp-nav-cta { display: flex; gap: 0.75rem; }
+        .btn-lp-outline { padding: 0.5rem 1.25rem; border: 1px solid var(--border); border-radius: 8px; color: white; font-weight: 600; font-size: 0.875rem; transition: all 0.15s; background: transparent; }
+        .btn-lp-outline:hover { background: rgba(255,255,255,0.06); color: white; }
+        .btn-lp-primary { padding: 0.5rem 1.25rem; border-radius: 8px; background: var(--primary); color: white; font-weight: 700; font-size: 0.875rem; transition: all 0.15s; border: none; }
+        .btn-lp-primary:hover { background: #4338CA; color: white; transform: translateY(-1px); }
+
+        /* ── HERO ───────────────────────────────────────────── */
+        .hero {
+            min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            padding: 8rem 2rem 4rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute; inset: 0;
+            background:
+                radial-gradient(ellipse 800px 600px at 50% -100px, rgba(79,70,229,0.2) 0%, transparent 70%),
+                radial-gradient(ellipse 400px 400px at 80% 60%, rgba(124,58,237,0.1) 0%, transparent 60%);
+            pointer-events: none;
+        }
+        .hero-grid {
+            position: absolute; inset: 0;
+            background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 60px 60px;
+            mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%);
+            pointer-events: none;
+        }
+        .hero-content { position: relative; z-index: 1; max-width: 800px; }
+        .hero-pill {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.4em 1em; border-radius: 100px;
+            border: 1px solid rgba(79,70,229,0.4);
+            background: rgba(79,70,229,0.1);
+            color: #A5B4FC; font-size: 0.8rem; font-weight: 600;
+            margin-bottom: 2rem;
+        }
+        .hero-title {
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 900; line-height: 1.1;
+            letter-spacing: -0.03em;
+            margin-bottom: 1.5rem;
+        }
+        .hero-title .grad {
+            background: linear-gradient(135deg, #818CF8, #C084FC, #38BDF8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-sub { font-size: 1.15rem; color: var(--text-2); line-height: 1.75; margin-bottom: 2.5rem; max-width: 600px; margin-left: auto; margin-right: auto; }
+        .hero-cta { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-bottom: 3rem; }
+        .btn-hero-primary {
+            padding: 0.875rem 2rem; border-radius: 12px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white; font-weight: 700; font-size: 1rem;
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            transition: all 0.2s; box-shadow: 0 0 30px rgba(79,70,229,0.4);
+            border: none;
+        }
+        .btn-hero-primary:hover { color: white; transform: translateY(-2px); box-shadow: 0 0 40px rgba(79,70,229,0.6); }
+        .btn-hero-ghost {
+            padding: 0.875rem 2rem; border-radius: 12px;
+            border: 1px solid var(--border); background: rgba(255,255,255,0.04);
+            color: white; font-weight: 600; font-size: 1rem;
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            transition: all 0.2s;
+        }
+        .btn-hero-ghost:hover { color: white; background: rgba(255,255,255,0.08); }
+
+        /* ── STATS ROW ──────────────────────────────────────── */
+        .stats-row {
+            display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;
+        }
+        .stat-item { text-align: center; }
+        .stat-num { font-size: 1.75rem; font-weight: 900; background: linear-gradient(135deg, #818CF8, #38BDF8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .stat-lbl { font-size: 0.75rem; color: var(--text-2); font-weight: 500; margin-top: 2px; }
+
+        /* ── FEATURE GRID ───────────────────────────────────── */
+        .features { padding: 6rem 2rem; }
+        .features-title { text-align: center; font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 800; margin-bottom: 1rem; letter-spacing: -0.02em; }
+        .features-sub  { text-align: center; color: var(--text-2); font-size: 1.05rem; margin-bottom: 4rem; }
+        .feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; max-width: 1100px; margin: 0 auto; }
+        .feature-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px; padding: 1.75rem;
+            transition: all 0.2s;
+        }
+        .feature-card:hover { border-color: rgba(79,70,229,0.4); transform: translateY(-3px); box-shadow: 0 20px 40px rgba(79,70,229,0.1); }
+        .feature-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 1.25rem; }
+        .feature-name { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.5rem; color: white; }
+        .feature-desc { font-size: 0.875rem; color: var(--text-2); line-height: 1.65; }
+
+        /* ── HOW IT WORKS ───────────────────────────────────── */
+        .hiw { padding: 6rem 2rem; background: var(--surface); }
+        .hiw-step { display: flex; align-items: flex-start; gap: 1.5rem; max-width: 700px; margin: 0 auto 2.5rem; }
+        .hiw-num { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--secondary)); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1rem; flex-shrink: 0; }
+        .hiw-title { font-size: 1.05rem; font-weight: 700; color: white; margin-bottom: 0.4rem; }
+        .hiw-desc  { font-size: 0.875rem; color: var(--text-2); line-height: 1.65; }
+
+        /* ── CTA SECTION ───────────────────────────────────── */
+        .cta-section { padding: 6rem 2rem; text-align: center; }
+        .cta-card { background: linear-gradient(135deg, rgba(79,70,229,0.2), rgba(124,58,237,0.1)); border: 1px solid rgba(79,70,229,0.3); border-radius: 24px; padding: 4rem 2rem; max-width: 680px; margin: 0 auto; }
+
+        /* ── FOOTER ─────────────────────────────────────────── */
+        .lp-footer { text-align: center; padding: 2rem; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--text-2); }
+
+        @media (max-width: 768px) {
+            .lp-nav-links { display: none; }
+            .hero-title { font-size: 2.2rem; }
+            .hiw-step { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── NAVBAR ─────────────────────────────────────────────── -->
+<nav class="lp-nav">
+    <div class="lp-nav-brand">
+        <div class="lp-nav-icon">🤖</div>
+        <span>AI Career</span>
+    </div>
+    <div class="lp-nav-links">
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How It Works</a>
+    </div>
+    <div class="lp-nav-cta">
+        <a href="{{ url_for('auth.login') }}" class="btn-lp-outline">Sign In</a>
+        <a href="{{ url_for('auth.register') }}" class="btn-lp-primary">Get Started Free</a>
+    </div>
+</nav>
+
+<!-- ── HERO ───────────────────────────────────────────────── -->
+<section class="hero">
+    <div class="hero-grid"></div>
+    <div class="hero-content">
+        <div class="hero-pill">
+            <i class="bi bi-stars"></i> Powered by Qwen AI · Next-Gen Language Model
+        </div>
+        <h1 class="hero-title">
+            Your AI-Powered<br><span class="grad">Career Intelligence</span><br>Platform
+        </h1>
+        <p class="hero-sub">
+            Analyze your resume against top companies, generate ATS-optimized resumes with 43+ templates,
+            practice mock interviews and build a personalized learning roadmap — all in one platform.
+        </p>
+        <div class="hero-cta">
+            <a href="{{ url_for('auth.register') }}" class="btn-hero-primary">
+                <i class="bi bi-stars"></i> Start for Free
+            </a>
+            <a href="{{ url_for('auth.login') }}" class="btn-hero-ghost">
+                <i class="bi bi-box-arrow-in-right"></i> Sign In
+            </a>
+        </div>
+        <div class="stats-row">
+            <div class="stat-item"><div class="stat-num">8</div><div class="stat-lbl">Analysis Dimensions</div></div>
+            <div class="stat-item"><div class="stat-num">43+</div><div class="stat-lbl">Resume Templates</div></div>
+            <div class="stat-item"><div class="stat-num">500+</div><div class="stat-lbl">MCQ Questions</div></div>
+            <div class="stat-item"><div class="stat-num">100%</div><div class="stat-lbl">AI-Driven</div></div>
+        </div>
+    </div>
+</section>
+
+<!-- ── FEATURES ───────────────────────────────────────────── -->
+<section class="features" id="features">
+    <h2 class="features-title">Everything you need to get placed</h2>
+    <p class="features-sub">Six powerful AI modules, one seamless platform.</p>
+    <div class="feature-grid">
+        {% set features = [
+            ('📊', 'AI Resume Analysis', 'Score your resume across 8 dimensions: ATS, skills, tech match, grammar, formatting, and more — with detailed AI feedback.', 'linear-gradient(135deg,#EEF2FF,#C7D2FE)'),
+            ('🏢', 'Company Intelligence', 'Explore tech stacks of top companies, see how well your skills match, and understand what they look for.', 'linear-gradient(135deg,#F0FDF4,#A7F3D0)'),
+            ('✨', 'AI Resume Tailor', 'One-click rewrite of your resume with ATS keyword injection, professional summary generation and formatting fixes.', 'linear-gradient(135deg,#FFFBEB,#FDE68A)'),
+            ('📄', 'Resume Builder', '43+ premium resume templates. Generate a tailored, ATS-safe resume for any company in under a minute.', 'linear-gradient(135deg,#FDF2F8,#FBCFE8)'),
+            ('🗺️', 'Learning Roadmap', 'AI-generated week-by-week skill development plan based on your gaps, with resources, YouTube links and project ideas.', 'linear-gradient(135deg,#EFF6FF,#BFDBFE)'),
+            ('🎯', 'Interview Prep', 'Company-specific AI questions + built-in MCQ test engine with timer, navigator, and instant results across 5 categories.', 'linear-gradient(135deg,#F5F3FF,#DDD6FE)'),
+        ] %}
+        {% for emoji, name, desc, bg in features %}
+        <div class="feature-card">
+            <div class="feature-icon" style="background:{{ bg }};">{{ emoji }}</div>
+            <div class="feature-name">{{ name }}</div>
+            <div class="feature-desc">{{ desc }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- ── HOW IT WORKS ────────────────────────────────────────── -->
+<section class="hiw" id="how-it-works">
+    <h2 class="features-title" style="margin-bottom:1rem;">How it works</h2>
+    <p class="features-sub" style="margin-bottom:3.5rem;">From signup to offer letter in 4 steps.</p>
+    {% set steps = [
+        ('Create Profile', 'Sign up, fill your profile, upload your resume. We extract your skills automatically.'),
+        ('Choose Company & Run Analysis', 'Select a target company. Our AI scores your resume across 8 dimensions and identifies exact gaps.'),
+        ('Generate & Optimize', 'Build an ATS-optimized resume with our builder, or one-click optimize your existing one.'),
+        ('Practice & Learn', 'Generate personalized interview questions, take timed MCQ tests, and follow your AI learning roadmap.'),
+    ] %}
+    {% for title, desc in steps %}
+    <div class="hiw-step">
+        <div class="hiw-num">{{ loop.index }}</div>
+        <div>
+            <div class="hiw-title">{{ title }}</div>
+            <div class="hiw-desc">{{ desc }}</div>
+        </div>
+    </div>
+    {% endfor %}
+</section>
+
+<!-- ── CTA ─────────────────────────────────────────────────── -->
+<section class="cta-section">
+    <div class="cta-card">
+        <div style="font-size:3rem; margin-bottom:1.5rem;">🚀</div>
+        <h2 style="font-size:2rem; font-weight:800; margin-bottom:1rem;">Ready to land your dream job?</h2>
+        <p style="color:var(--text-2); margin-bottom:2rem; font-size:1rem; line-height:1.7;">
+            Join and use advanced AI to stand out from thousands of applicants.
+            No credit card required — start for free today.
+        </p>
+        <a href="{{ url_for('auth.register') }}" class="btn-hero-primary" style="font-size:1.05rem; padding:1rem 2.5rem;">
+            <i class="bi bi-stars"></i> Create Free Account
+        </a>
+    </div>
+</section>
+
+<!-- ── FOOTER ─────────────────────────────────────────────── -->
+<footer class="lp-footer">
+    © 2025 AI Career Intelligence Platform · Built with Qwen AI
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

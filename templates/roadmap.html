@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}Learning Roadmap — AI Career Intelligence Platform{% endblock %}
+{% block page_title %}Learning Roadmap{% endblock %}
+
+{% block content %}
+<div class="stagger-children">
+
+<!-- ── HEADER ─────────────────────────────────────────────── -->
+<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-4); margin-bottom:var(--space-6);" class="fade-in-up">
+    <div>
+        <h1 style="font-size:var(--text-2xl); font-weight:800; margin-bottom:var(--space-1);">Learning Roadmap</h1>
+        <p style="color:var(--text-3); font-size:var(--text-sm); margin:0;">AI-generated personalized skill development plan based on your target role.</p>
+    </div>
+    <button class="btn btn-gradient" onclick="document.getElementById('generateModal').style.display='flex'">
+        <i class="bi bi-map-fill"></i> Generate New Roadmap
+    </button>
+</div>
+
+<div style="display:grid; grid-template-columns: 300px 1fr; gap:var(--space-5);">
+
+<!-- ── LEFT: MY ROADMAPS ────────────────────────────────── -->
+<div>
+    <div class="card fade-in-up-delay-1">
+        <div class="card-header" style="padding:var(--space-3) var(--space-4);">
+            <span class="card-header-title" style="font-size:var(--text-sm);">My Roadmaps</span>
+        </div>
+        <div class="card-body" style="padding:var(--space-2);">
+            {% if roadmaps %}
+            {% for rm in roadmaps %}
+            <a href="{{ url_for('roadmap.index', roadmap_id=rm.id) }}"
+               style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3); border-radius:var(--radius-md); cursor:pointer; text-decoration:none; margin-bottom:2px;
+                      background:{{ 'var(--primary-50)' if selected_roadmap and selected_roadmap.id == rm.id else 'transparent' }};
+                      color:{{ 'var(--primary)' if selected_roadmap and selected_roadmap.id == rm.id else 'var(--text-1)' }};">
+                <i class="bi bi-map{{ '-fill' if selected_roadmap and selected_roadmap.id == rm.id else '' }}" style="font-size:1rem; flex-shrink:0;"></i>
+                <div style="flex:1; min-width:0;">
+                    <div style="font-size:var(--text-sm); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ rm.title }}</div>
+                    <div style="font-size:var(--text-xs); color:var(--text-3);">{{ rm.completion_percent or 0 }}% complete</div>
+                </div>
+            </a>
+            {% endfor %}
+            {% else %}
+            <div style="padding:var(--space-6); text-align:center;">
+                <div style="font-size:var(--text-sm); color:var(--text-3);">No roadmaps yet.</div>
+                <button class="btn btn-primary btn-sm" style="margin-top:var(--space-3);"
+                        onclick="document.getElementById('generateModal').style.display='flex'">
+                    <i class="bi bi-plus"></i> Generate One
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ── RIGHT: ROADMAP TIMELINE ──────────────────────────── -->
+<div class="fade-in-up-delay-2">
+{% if selected_roadmap and items %}
+
+    <!-- Roadmap Header -->
+    <div class="card" style="margin-bottom:var(--space-5);">
+        <div class="card-body" style="display:flex; align-items:center; gap:var(--space-5); flex-wrap:wrap;">
+            <div style="flex:1;">
+                <div style="font-size:var(--text-xl); font-weight:800; margin-bottom:var(--space-2);">{{ selected_roadmap.title }}</div>
+                <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+                    <span class="badge badge-primary"><i class="bi bi-clock"></i> {{ selected_roadmap.total_weeks or '?' }} weeks</span>
+                    <span class="badge badge-neutral">{{ items|length }} skills</span>
+                    <span class="badge {{ 'badge-success' if selected_roadmap.completion_percent >= 80 else 'badge-primary' if selected_roadmap.completion_percent >= 40 else 'badge-neutral' }}">
+                        {{ selected_roadmap.completion_percent or 0 }}% complete
+                    </span>
+                </div>
+            </div>
+            <div style="width:180px;">
+                <div style="display:flex; justify-content:space-between; font-size:var(--text-xs); color:var(--text-3); margin-bottom:4px;">
+                    <span>Overall Progress</span>
+                    <span id="overallPct">{{ selected_roadmap.completion_percent or 0 }}%</span>
+                </div>
+                <div class="progress" style="height:8px;">
+                    <div class="progress-bar" id="overallBar"
+                         data-width="{{ selected_roadmap.completion_percent or 0 }}%"
+                         style="width:0%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="timeline">
+        {% for item in items %}
+        {% set status_class = 'completed' if item.status == 'Completed' else 'in-progress' if item.status == 'In Progress' else 'not-started' %}
+        <div class="timeline-item" id="item-{{ item.id }}">
+            <div class="timeline-dot {{ status_class }}">
+                {% if item.status == 'Completed' %}
+                <i class="bi bi-check" style="color:white; font-size:0.7rem;"></i>
+                {% elif item.status == 'In Progress' %}
+                <i class="bi bi-play-fill" style="color:white; font-size:0.7rem;"></i>
+                {% else %}
+                <span style="font-size:0.7rem; font-weight:700; color:var(--text-3);">{{ loop.index }}</span>
+                {% endif %}
+            </div>
+
+            <div class="timeline-card {{ status_class }}" style="position:relative;">
+                <!-- Header -->
+                <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-3); margin-bottom:var(--space-3);">
+                    <div>
+                        <div class="timeline-step-num">Step {{ loop.index }} of {{ items|length }}</div>
+                        <div class="timeline-skill-name">
+                            {{ item.skill_name }}
+                            {% set prio_colors = {'High':'var(--danger)','Medium':'var(--warning)','Low':'var(--success)'} %}
+                            <span class="badge" style="background:{{ prio_colors.get(item.priority,'var(--text-3)') }}20; color:{{ prio_colors.get(item.priority,'var(--text-3)') }}; font-size:0.65rem;">
+                                {{ item.priority }}
+                            </span>
+                        </div>
+                        <div style="font-size:var(--text-xs); color:var(--text-3);">
+                            <i class="bi bi-clock"></i> ~{{ item.duration_weeks }} week{{ 's' if item.duration_weeks != 1 else '' }}
+                        </div>
+                    </div>
+                    <!-- Status buttons -->
+                    <div style="display:flex; gap:var(--space-2); flex-wrap:wrap;">
+                        {% for st, icon, cls in [('Not Started','bi-circle','btn-ghost'),('In Progress','bi-play-circle','btn-secondary'),('Completed','bi-check-circle-fill','btn-success')] %}
+                        <button class="btn btn-sm {{ 'btn-success' if item.status == st else ('btn-secondary' if st == 'In Progress' and item.status == st else 'btn-ghost') }}"
+                                style="font-size:0.7rem; padding:0.25rem 0.5rem; {{ 'background:var(--success); color:white;' if item.status == st and st == 'Completed' else '' }}"
+                                onclick="updateStatus({{ item.id }}, '{{ st }}', this)"
+                                title="Mark as {{ st }}">
+                            <i class="bi {{ icon }}"></i> {{ st }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Resources -->
+                {% if item.resources or item.youtube_links or item.doc_links %}
+                <div style="display:flex; flex-wrap:wrap; gap:var(--space-2); margin-bottom:var(--space-3);">
+                    {% if item.youtube_links %}
+                    <a href="{{ item.youtube_links }}" target="_blank" class="btn btn-sm btn-ghost" style="font-size:0.75rem; color:#FF0000;">
+                        <i class="bi bi-youtube"></i> Watch Tutorial
+                    </a>
+                    {% endif %}
+                    {% if item.doc_links %}
+                    <a href="{{ item.doc_links }}" target="_blank" class="btn btn-sm btn-ghost" style="font-size:0.75rem;">
+                        <i class="bi bi-book"></i> Documentation
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                {% if item.project_ideas %}
+                <div style="background:var(--primary-50); border-radius:var(--radius-sm); padding:var(--space-3); font-size:var(--text-xs); color:var(--primary-700);">
+                    <strong><i class="bi bi-lightbulb-fill"></i> Project Idea:</strong> {{ item.project_ideas }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+{% else %}
+    <div class="empty-state card" style="min-height:400px;">
+        <div class="empty-state-icon" style="font-size:2.5rem;">🗺️</div>
+        <div class="empty-state-title">No roadmap generated yet</div>
+        <div class="empty-state-desc">
+            Run an AI analysis first, then generate a personalized learning roadmap
+            based on the missing skills and your target company.
+        </div>
+        <div style="display:flex; gap:var(--space-3);">
+            <a href="{{ url_for('analysis.index') }}" class="btn btn-secondary btn-sm">
+                <i class="bi bi-graph-up-arrow"></i> Run Analysis
+            </a>
+            <button class="btn btn-gradient btn-sm" onclick="document.getElementById('generateModal').style.display='flex'">
+                <i class="bi bi-map-fill"></i> Generate Roadmap
+            </button>
+        </div>
+    </div>
+{% endif %}
+</div>
+
+</div><!-- grid -->
+
+<!-- ── GENERATE MODAL ───────────────────────────────────── -->
+<div id="generateModal" class="ai-loading-overlay" style="display:none; align-items:center; justify-content:center;"
+     onclick="if(event.target===this) this.style.display='none'">
+    <div class="ai-loading-card" style="text-align:left; max-width:500px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-5);">
+            <div style="font-size:var(--text-xl); font-weight:800;">🗺️ Generate Roadmap</div>
+            <button onclick="document.getElementById('generateModal').style.display='none'"
+                    class="btn btn-ghost btn-sm"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <form action="{{ url_for('roadmap.generate') }}" method="POST" id="roadmapForm">
+            <div style="display:flex; flex-direction:column; gap:var(--space-4);">
+                <div>
+                    <label class="form-label">Target Company (optional)</label>
+                    <select class="form-select" name="company_id">
+                        <option value="">— No specific company —</option>
+                        {% for c in companies %}
+                        <option value="{{ c.id }}">{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Based on Analysis (optional)</label>
+                    <select class="form-select" name="analysis_id">
+                        <option value="">— No analysis —</option>
+                        {% for a in recent_analyses %}
+                        <option value="{{ a.id }}">{{ a.company_name or a.job_title }} — {{ a.overall_score }}%</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Job Title</label>
+                    <input type="text" class="form-control" name="job_title" value="Software Engineer">
+                </div>
+                <button type="submit" class="btn btn-gradient w-100">
+                    <i class="bi bi-stars"></i> Generate AI Roadmap
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+</div><!-- stagger-children -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateStatus(itemId, status, btn) {
+    fetch(`/roadmap/item/${itemId}/update-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Update timeline dot
+            const item = document.getElementById(`item-${itemId}`);
+            if (item) {
+                const dot = item.querySelector('.timeline-dot');
+                dot.className = 'timeline-dot ' + (status === 'Completed' ? 'completed' : status === 'In Progress' ? 'in-progress' : 'not-started');
+                dot.innerHTML = status === 'Completed' ? '<i class="bi bi-check" style="color:white;font-size:0.7rem;"></i>' :
+                                status === 'In Progress' ? '<i class="bi bi-play-fill" style="color:white;font-size:0.7rem;"></i>' :
+                                `<span style="font-size:0.7rem;font-weight:700;color:var(--text-3);">${dot.textContent.trim()}</span>`;
+            }
+            // Update progress bar
+            if (data.completion !== undefined) {
+                const pct = Math.round(data.completion);
+                document.getElementById('overallPct').textContent = pct + '%';
+                const bar = document.getElementById('overallBar');
+                if (bar) { bar.style.width = pct + '%'; }
+            }
+            Toast.success(`Marked as "${status}"`);
+        }
+    })
+    .catch(() => Toast.error('Failed to update status.'));
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    attachAIFormLoading('roadmapForm', [
+        'Analyzing missing skills…',
+        'Building personalized plan…',
+        'Finding learning resources…',
+        'Estimating timelines…',
+        'Generating project ideas…'
+    ]);
+});
+</script>
+{% endblock %}
