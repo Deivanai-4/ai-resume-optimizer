@@ -4,7 +4,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY', '')    
+    # Must be set via the SECRET_KEY environment variable on every deployment.
+    # An empty or missing value will cause Flask session writes to fail at runtime.
+    SECRET_KEY = os.environ.get('SECRET_KEY')  # No fallback — must be set in env
     # MySQL Configuration
     DB_HOST = os.environ.get('DB_HOST', 'localhost')
     DB_PORT = int(os.environ.get('DB_PORT', 3306))

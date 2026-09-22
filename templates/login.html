@@ -23,13 +23,13 @@
                     <label class="form-label" for="password" style="margin:0; color:#111; font-weight:600;">Password</label>
                     <a href="{{ url_for('auth.forgot_password') }}" style="font-size:0.8rem; color:#4F46E5; text-decoration:none; font-weight:500;">Forgot password?</a>
                 </div>
-                <div class="input-icon-wrap" style="position:relative;">
-                    <i class="bi bi-lock" style="position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:#666;"></i>
+                <div class="input-icon-wrap" style="position:relative; border-radius:100px; overflow:hidden;">
+                    <i class="bi bi-lock" style="position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:#666; z-index:2; pointer-events:none;"></i>
                     <input type="password" class="form-control auth-input" id="password" name="password"
                            required autocomplete="current-password" placeholder="Enter your password"
-                           style="padding-left:2.75rem; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.8); color:#111; border-radius:100px; height:48px;">
+                           style="padding-left:2.75rem; padding-right:3.25rem; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.8); color:#111; border-radius:100px; height:48px; position:relative; z-index:1;">
                     <button type="button" onclick="togglePass('password', 'eyeIcon')"
-                            style="position:absolute; right:1rem; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:#666;">
+                            style="position:absolute; right:0; top:0; height:48px; width:48px; background:transparent; border:none; cursor:pointer; color:#555; display:flex; align-items:center; justify-content:center; z-index:3;">
                         <i class="bi bi-eye" id="eyeIcon"></i>
                     </button>
                 </div>

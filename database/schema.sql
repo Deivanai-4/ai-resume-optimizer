@@ -173,6 +173,7 @@ CREATE TABLE IF NOT EXISTS companies (
     avg_salary VARCHAR(100) NULL,
     recruitment_process TEXT NULL,
     culture TEXT NULL,
+    ai_profile LONGTEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_name (name),
     INDEX idx_slug (slug)
@@ -423,3 +424,23 @@ INSERT INTO company_jobs (company_id, job_title, job_type, location, salary_rang
 (8, 'SDE-1', 'Full-time', 'Bengaluru, India', '20-35 LPA', '0-2 years', 'Software Development Engineer at Amazon. Work on large-scale distributed systems that power the worlds largest e-commerce and cloud platform.'),
 (9, 'Software Engineer', 'Full-time', 'Hyderabad/Bengaluru, India', '25-50 LPA', '0-2 years', 'Engineer at Google working on products used by billions. Involves complex algorithm design and system architecture.'),
 (14, 'Software Engineer', 'Full-time', 'Chennai, India', '8-18 LPA', '0-2 years', 'Join Freshworks engineering team to build the next generation of customer experience software used by 60,000+ businesses globally.');
+
+CREATE TABLE IF NOT EXISTS generated_resumes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    source_resume_id INT,
+    company_id INT,
+    company_name VARCHAR(255),
+    job_role VARCHAR(255),
+    job_description TEXT,
+    template VARCHAR(255),
+    content_json LONGTEXT,
+    ats_score INT,
+    skill_match INT,
+    label VARCHAR(255),
+    is_active TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+

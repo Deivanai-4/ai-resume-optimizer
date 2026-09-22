@@ -250,6 +250,9 @@
     </div><!-- #main-content -->
 </div><!-- .wrapper -->
 
+<!-- Modals Block (outside wrapper to avoid CSS transform containing block issues) -->
+{% block modals %}{% endblock %}
+
 <!-- Toast Stack -->
 <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
 

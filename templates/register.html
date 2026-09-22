@@ -30,14 +30,14 @@
             </div>
             <div>
                 <label class="form-label" for="password" style="color:#111; font-weight:600; margin-bottom:0.25rem;">Password</label>
-                <div class="input-icon-wrap" style="position:relative;">
-                    <i class="bi bi-lock" style="position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:#666;"></i>
+                <div class="input-icon-wrap" style="position:relative; border-radius:100px; overflow:hidden;">
+                    <i class="bi bi-lock" style="position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:#666; z-index:2; pointer-events:none;"></i>
                     <input type="password" class="form-control" id="password" name="password"
                            required autocomplete="new-password" placeholder="Enter a strong password (Min. 8 characters)"
                            oninput="checkStrength(this.value)"
-                           style="padding-left:2.75rem; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.8); color:#111; border-radius:100px; height:48px;">
+                           style="padding-left:2.75rem; padding-right:3.25rem; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.8); color:#111; border-radius:100px; height:48px; position:relative; z-index:1;">
                     <button type="button" onclick="togglePass('password','eye1')"
-                            style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#666;">
+                            style="position:absolute; right:0; top:0; height:48px; width:48px; background:transparent; border:none; cursor:pointer; color:#555; display:flex; align-items:center; justify-content:center; z-index:3;">
                         <i class="bi bi-eye" id="eye1"></i>
                     </button>
                 </div>
@@ -51,13 +51,13 @@
             </div>
             <div>
                 <label class="form-label" for="confirm_password" style="color:#111; font-weight:600; margin-bottom:0.25rem;">Confirm Password</label>
-                <div class="input-icon-wrap" style="position:relative;">
-                    <i class="bi bi-lock-fill" style="position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:#666;"></i>
+                <div class="input-icon-wrap" style="position:relative; border-radius:100px; overflow:hidden;">
+                    <i class="bi bi-lock-fill" style="position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:#666; z-index:2; pointer-events:none;"></i>
                     <input type="password" class="form-control" id="confirm_password" name="confirm_password"
                            required autocomplete="new-password" placeholder="Confirm your password"
-                           style="padding-left:2.75rem; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.8); color:#111; border-radius:100px; height:48px;">
+                           style="padding-left:2.75rem; padding-right:3.25rem; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.8); color:#111; border-radius:100px; height:48px; position:relative; z-index:1;">
                     <button type="button" onclick="togglePass('confirm_password','eye2')"
-                            style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#666;">
+                            style="position:absolute; right:0; top:0; height:48px; width:48px; background:transparent; border:none; cursor:pointer; color:#555; display:flex; align-items:center; justify-content:center; z-index:3;">
                         <i class="bi bi-eye" id="eye2"></i>
                     </button>
                 </div>

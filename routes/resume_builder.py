@@ -280,8 +280,8 @@ def change_template(gen_id):
     user_id = session['user_id']
     try:
         body     = request.get_json(force=True) or {}
-        template = body.get('template', 'classic')
-        if template not in ('classic', 'modern', 'minimal'):
+        template = body.get('template', 'classic_ats')
+        if template not in ('classic_ats', 'modern_pro', 'minimal_ats', 'profile_photo', 'tech_dev'):
             return jsonify({'success': False, 'message': 'Invalid template'}), 400
         GeneratedResumeModel.update_template(gen_id, user_id, template)
         return jsonify({'success': True})

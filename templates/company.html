@@ -88,7 +88,7 @@
         </div>
     </div>
 
-    <!-- Tabs: Tech Stack / Jobs / Recruitment -->
+    <!-- Tabs: Tech Stack / Jobs / Recruitment / Intelligence -->
     <div class="nav-tabs-line" style="margin-bottom:var(--space-4);" data-tab-group="company-detail">
         <button class="tab-btn active" data-tab="tech">
             <i class="bi bi-cpu me-1"></i> Tech Stack
@@ -102,6 +102,9 @@
             <i class="bi bi-diagram-3 me-1"></i> Hiring Process
         </button>
         {% endif %}
+        <button class="tab-btn" data-tab="intelligence">
+            <i class="bi bi-magic me-1"></i> AI Intelligence
+        </button>
     </div>
 
     <!-- Tech Stack -->
@@ -190,6 +193,98 @@
         </div>
     </div>
     {% endif %}
+
+    <!-- AI Intelligence -->
+    <div data-tab-panel="company-detail" data-tab="intelligence" style="display:none;" class="fade-in">
+        {% if ai_profile %}
+        <div class="card" style="margin-bottom:var(--space-4); background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 100%); color: white; border: none;">
+            <div class="card-body">
+                <h3 style="margin-bottom:var(--space-2); color:white; font-size:var(--text-lg);"><i class="bi bi-lightning-charge-fill text-warning"></i> AI Company Profile</h3>
+                <p style="font-size:var(--text-sm); margin-bottom:0; color:var(--primary-100);">Generated intelligence for {{ selected_company.name }}</p>
+            </div>
+        </div>
+        
+        <div class="grid-2">
+            <!-- Career & Tech -->
+            <div class="card">
+                <div class="card-header"><h4 style="font-size:var(--text-base); margin:0;">Career & Tech Stack</h4></div>
+                <div class="card-body">
+                    {% if ai_profile.career.important_skills %}
+                    <h5 style="font-size:var(--text-sm); color:var(--text-3); text-transform:uppercase; margin-bottom:var(--space-2);">Important Skills</h5>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:var(--space-4);">
+                        {% for skill in ai_profile.career.important_skills %}
+                        <span class="badge badge-primary">{{ skill }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    {% if ai_profile.career.freshers_roles %}
+                    <h5 style="font-size:var(--text-sm); color:var(--text-3); text-transform:uppercase; margin-bottom:var(--space-2);">Fresher Roles</h5>
+                    <ul style="font-size:var(--text-sm); margin-bottom:var(--space-4); padding-left:20px;">
+                        {% for role in ai_profile.career.freshers_roles %}
+                        <li>{{ role }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    
+                    {% if ai_profile.technology.tech_stack %}
+                    <h5 style="font-size:var(--text-sm); color:var(--text-3); text-transform:uppercase; margin-bottom:var(--space-2);">Known Tech Stack</h5>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                        {% for tech in ai_profile.technology.tech_stack %}
+                        <span class="badge badge-neutral">{{ tech }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Interview Prep -->
+            <div class="card">
+                <div class="card-header"><h4 style="font-size:var(--text-base); margin:0;">Interview Prep Guide</h4></div>
+                <div class="card-body">
+                    {% if ai_profile.interview.likely_interview_topics %}
+                    <h5 style="font-size:var(--text-sm); color:var(--text-3); text-transform:uppercase; margin-bottom:var(--space-2);">General Topics</h5>
+                    <ul style="font-size:var(--text-sm); margin-bottom:var(--space-4); padding-left:20px;">
+                        {% for topic in ai_profile.interview.likely_interview_topics %}
+                        <li>{{ topic }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    
+                    {% if ai_profile.interview.technical_topics %}
+                    <h5 style="font-size:var(--text-sm); color:var(--text-3); text-transform:uppercase; margin-bottom:var(--space-2);">Technical Topics</h5>
+                    <ul style="font-size:var(--text-sm); margin-bottom:var(--space-4); padding-left:20px;">
+                        {% for topic in ai_profile.interview.technical_topics %}
+                        <li>{{ topic }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    
+                    {% if ai_profile.workplace.company_culture %}
+                    <h5 style="font-size:var(--text-sm); color:var(--text-3); text-transform:uppercase; margin-bottom:var(--space-2);">Work Culture</h5>
+                    <p style="font-size:var(--text-sm); line-height:1.6;">{{ ai_profile.workplace.company_culture }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <form action="{{ url_for('company.generate_intelligence', slug=selected_company.slug) }}" method="POST" style="margin-top:var(--space-4); text-align:right;">
+            <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-arrow-clockwise"></i> Refresh AI Profile</button>
+        </form>
+
+        {% else %}
+        <div class="empty-state card">
+            <div class="empty-state-icon" style="background:var(--primary-100); color:var(--primary);"><i class="bi bi-magic"></i></div>
+            <div class="empty-state-title">Generate AI Intelligence Profile</div>
+            <div class="empty-state-desc" style="max-width:500px; margin:0 auto var(--space-4);">
+                Use our advanced AI assistant to generate a comprehensive, structured company profile designed specifically for placement preparation, including tech stacks, interview topics, and career guidance.
+            </div>
+            <form action="{{ url_for('company.generate_intelligence', slug=selected_company.slug) }}" method="POST">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-magic"></i> Generate Now</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
 </div>
 
 {% else %}
@@ -235,15 +330,127 @@
         {% endfor %}
     </div>
     {% else %}
-    <div class="empty-state card">
+    <div class="empty-state card" id="no-results-state">
         <div class="empty-state-icon"><i class="bi bi-building"></i></div>
         <div class="empty-state-title">No companies found</div>
         <div class="empty-state-desc">Try a different search term.</div>
         <a href="{{ url_for('company.index') }}" class="btn btn-primary btn-sm">View All Companies</a>
     </div>
+
+    {% if search_query %}
+    <!-- AI Generate Banner -->
+    <div class="card" id="ai-generate-banner"
+         style="margin-top:var(--space-5); border:2px dashed var(--primary-300); background:var(--primary-50); text-align:center; padding:var(--space-8);">
+        <div style="font-size:2.5rem; margin-bottom:var(--space-3);">🤖</div>
+        <h3 style="font-size:var(--text-lg); font-weight:800; margin-bottom:var(--space-2); color:var(--primary);">Generate AI Profile for "{{ search_query }}"</h3>
+        <p style="font-size:var(--text-sm); color:var(--text-2); max-width:480px; margin:0 auto var(--space-5);">
+            This company isn't in our database yet. Our AI can generate a structured intelligence profile including
+            tech stack, interview prep topics, career guidance, and workplace insights — saved for future use.
+        </p>
+        <button id="ai-generate-btn" class="btn btn-primary"
+                onclick="generateAIProfile('{{ search_query|e }}')"
+                style="font-size:var(--text-base); padding:var(--space-3) var(--space-7);">
+            <i class="bi bi-magic me-2"></i> Generate Company Intelligence
+        </button>
+        <div style="margin-top:var(--space-3); font-size:var(--text-xs); color:var(--text-3);">
+            <i class="bi bi-info-circle"></i>
+            Powered by Qwen AI &nbsp;·&nbsp; Profile saved to database for instant access next time
+        </div>
+    </div>
+    {% endif %}
     {% endif %}
 </div>
 {% endif %}
 
 </div><!-- stagger-children -->
+
+<!-- AI Generation Overlay -->
+<div id="ai-loading-overlay" style="
+    display:none; position:fixed; inset:0; z-index:9999;
+    background:rgba(0,0,0,0.65); backdrop-filter:blur(6px);
+    align-items:center; justify-content:center; flex-direction:column; gap:var(--space-4);
+">
+    <div style="
+        background:var(--surface-1); border-radius:var(--radius-xl);
+        padding:var(--space-8) var(--space-10); text-align:center;
+        box-shadow:var(--shadow-2xl); max-width:400px;
+    ">
+        <div style="font-size:3rem; margin-bottom:var(--space-3); animation:spin 1.5s linear infinite; display:inline-block;">⚙️</div>
+        <h3 style="font-size:var(--text-lg); font-weight:800; margin-bottom:var(--space-2);">Generating AI Profile</h3>
+        <p id="ai-loading-msg" style="font-size:var(--text-sm); color:var(--text-2); margin:0;">
+            Contacting AI… this may take 15–30 seconds.
+        </p>
+        <div style="margin-top:var(--space-4); height:4px; background:var(--surface-3); border-radius:99px; overflow:hidden;">
+            <div id="ai-progress-bar" style="height:100%; width:0%; background:linear-gradient(90deg, var(--primary), var(--primary-400)); border-radius:99px; transition:width 0.4s ease;"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
+
+<script>
+function generateAIProfile(companyName) {
+    const btn = document.getElementById('ai-generate-btn');
+    const overlay = document.getElementById('ai-loading-overlay');
+    const progressBar = document.getElementById('ai-progress-bar');
+    const loadingMsg = document.getElementById('ai-loading-msg');
+
+    // Disable button and show overlay
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i> Generating…';
+    overlay.style.display = 'flex';
+
+    // Animate progress bar
+    let progress = 0;
+    const messages = [
+        'Searching company database…',
+        'Contacting AI engine…',
+        'Analysing tech stack…',
+        'Building interview guide…',
+        'Saving to database…'
+    ];
+    let msgIdx = 0;
+    const progressTimer = setInterval(() => {
+        progress = Math.min(progress + (progress < 80 ? 2 : 0.5), 90);
+        progressBar.style.width = progress + '%';
+        if (progress > 20 * (msgIdx + 1) && msgIdx < messages.length - 1) {
+            msgIdx++;
+            loadingMsg.textContent = messages[msgIdx];
+        }
+    }, 300);
+
+    fetch('/api/company/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company_name: companyName })
+    })
+    .then(r => r.json())
+    .then(data => {
+        clearInterval(progressTimer);
+        progressBar.style.width = '100%';
+
+        if (data.success && data.company && data.company.slug) {
+            loadingMsg.textContent = 'Profile created! Redirecting…';
+            setTimeout(() => {
+                window.location.href = '/company/' + data.company.slug;
+            }, 600);
+        } else {
+            overlay.style.display = 'none';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-magic me-2"></i> Try Again';
+            const errMsg = (data.message || 'AI generation failed. Please try again.');
+            alert('⚠️ ' + errMsg);
+        }
+    })
+    .catch(err => {
+        clearInterval(progressTimer);
+        overlay.style.display = 'none';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-magic me-2"></i> Retry';
+        alert('Network error: ' + err.message);
+    });
+}
+</script>
 {% endblock %}

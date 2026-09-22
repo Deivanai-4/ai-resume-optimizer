@@ -619,6 +619,10 @@ def generate_interview_questions(
                 f"{p.get('title','')} ({p.get('technologies','')})" for p in (user_projects or [])[:4]
             ) or "No projects listed"
 
+            # Build a list of seen questions to explicitly tell the LLM to avoid them
+            seen_list = list(seen_questions)[:100]  # Cap at 100 to avoid token bloat
+            seen_str = "\\n- ".join(seen_list) if seen_list else "None"
+
             prompt = f"""You are an expert technical recruiter, company intelligence analyst, and interview preparation specialist.
 
 You are generating interview preparation content for a career intelligence platform.
@@ -634,6 +638,9 @@ COMPANY INFORMATION:
 - Company: "{company_name}"
 - Job description: "{job_description[:600] if job_description else 'Not provided'}"
 
+PREVIOUSLY ASKED QUESTIONS (DO NOT GENERATE THESE):
+- {seen_str}
+
 Your task is to generate structured interview preparation information specifically for this company and target role.
 
 IMPORTANT:
@@ -643,7 +650,7 @@ IMPORTANT:
 4. Identify skills that are likely relevant to the selected role.
 5. Questions must be divided by category and difficulty.
 6. Questions must be suitable for students/freshers unless the user's experience indicates otherwise.
-7. Avoid repeating the same question.
+7. CRITICAL: Avoid repeating the same questions. You MUST generate completely new and different questions from the 'PREVIOUSLY ASKED QUESTIONS' list.
 8. Generate questions that test understanding, not only memorization.
 9. Technical questions should include practical/scenario-based questions where appropriate.
 10. HR questions should be relevant to the company and role.
@@ -710,8 +717,8 @@ RETURN EXACTLY THIS JSON STRUCTURE (generate at least 3 questions per difficulty
     return _static_question_pool(job_title, company_name, company_skills, seen_questions)
 
 
-def _convert_ai_response_to_list(data: dict, seen_questions: set) -> list:
-    """Flatten the structured AI JSON response into the flat list format the route expects."""
+def _convert_ai_response_to_list(data: dict, seen_questions: set) -> dict:
+    """Flatten the structured AI JSON response and include metadata."""
     import random
     result = []
     prep = data.get("interview_preparation", {})
@@ -748,7 +755,13 @@ def _convert_ai_response_to_list(data: dict, seen_questions: set) -> list:
     random.shuffle(result)
     for i, q in enumerate(result):
         q["id"] = i + 1
-    return result
+        
+    return {
+        "questions": result,
+        "company": data.get("company", {}),
+        "role": data.get("role", {}),
+        "recommended_topics": data.get("recommended_topics", [])
+    }
 
 
 def _static_question_pool(job_title: str, company_name: str, company_skills: list, seen_questions: set) -> list:
@@ -876,7 +889,13 @@ def _static_question_pool(job_title: str, company_name: str, company_skills: lis
         q["id"] = i + 1
         if "tip" not in q:
             q["tip"] = "Be concise and clear. Use real examples wherever possible."
-    return selected
+            
+    return {
+        "questions": selected,
+        "company": {"name": company_name},
+        "role": {"title": job_title},
+        "recommended_topics": []
+    }
 
 
 
@@ -944,7 +963,7 @@ def generate_resume_content(
 
 def analyze_company(
     company_name: str,
-    industry: str,
+    industry: str = "",
     description: str = "",
 ) -> dict:
     """Analyse a company and return structured overview data."""
@@ -955,37 +974,145 @@ def analyze_company(
 
     if token:
         prompt = (
-            f"You are a career research expert.\n\n"
-            f"Provide a structured overview of this company for a job-seeking student.\n"
-            f"Company: {company_name}\nIndustry: {industry}\n"
-            f"Description: {description[:800]}\n\n"
-            f"Return ONLY valid JSON:\n"
-            f'{{\n'
-            f'  "overview": "<2-3 sentence company overview>",\n'
-            f'  "culture": "<culture description>",\n'
-            f'  "interview_process": "<typical interview process>",\n'
-            f'  "growth_opportunities": "<career growth at this company>",\n'
-            f'  "work_life_balance": "<work-life balance notes>",\n'
-            f'  "key_products": ["<product1>", "<product2>"],\n'
-            f'  "headquarters": "<location>"\n'
-            f'}}'
+            f"You are a company intelligence assistant for a career intelligence platform.\n\n"
+            f"The user has entered the following company name:\n\n"
+            f"COMPANY NAME:\n"
+            f'"{company_name}"\n\n'
+            f"Your task is to create a structured company profile that can be used\n"
+            f"for career guidance, resume analysis, skill matching and interview preparation.\n\n"
+            f"IMPORTANT RULES:\n"
+            f"1. Identify the company from the provided company name.\n"
+            f"2. Return ONLY valid JSON.\n"
+            f"3. Do NOT use markdown.\n"
+            f"4. Do NOT use ```json.\n"
+            f"5. Do NOT include explanations outside the JSON.\n"
+            f"6. Do not invent specific facts such as employee counts, salaries,\n"
+            f"   interview experiences, recruitment processes or technologies\n"
+            f"   unless they are reasonably supported by the available information.\n"
+            f"7. If a field cannot be determined reliably, return:\n"
+            f'   "Not available"\n'
+            f"8. Clearly distinguish general industry knowledge from\n"
+            f"   company-specific information.\n"
+            f"9. Technology information should contain technologies that are\n"
+            f"   reasonably associated with the company's products, services,\n"
+            f"   engineering or publicly known technology environment.\n"
+            f"10. Interview information must be presented as\n"
+            f'    "likely/relevant preparation topics", NOT as confirmed questions\n'
+            f"    actually asked by the company unless such information is explicitly\n"
+            f"    provided to you.\n"
+            f"11. Keep the information useful for a student/fresher preparing\n"
+            f"    for placements.\n"
+            f"12. Generate concise but useful information.\n\n"
+            f"RETURN EXACTLY THIS JSON STRUCTURE:\n"
+            f"{{\n"
+            f'    "company": {{\n'
+            f'        "name": "{company_name}",\n'
+            f'        "official_name": "",\n'
+            f'        "industry": "",\n'
+            f'        "sub_industry": "",\n'
+            f'        "headquarters": "",\n'
+            f'        "locations": [],\n'
+            f'        "website": "",\n'
+            f'        "description": "",\n'
+            f'        "products_services": [],\n'
+            f'        "company_type": "",\n'
+            f'        "company_size": "",\n'
+            f'        "founded_year": ""\n'
+            f'    }},\n'
+            f'    "technology": {{\n'
+            f'        "tech_stack": [],\n'
+            f'        "programming_languages": [],\n'
+            f'        "frameworks": [],\n'
+            f'        "databases": [],\n'
+            f'        "cloud_platforms": [],\n'
+            f'        "developer_tools": []\n'
+            f'    }},\n'
+            f'    "career": {{\n'
+            f'        "important_skills": [],\n'
+            f'        "common_job_roles": [],\n'
+            f'        "freshers_roles": [],\n'
+            f'        "relevant_domains": []\n'
+            f'    }},\n'
+            f'    "interview": {{\n'
+            f'        "likely_interview_topics": [],\n'
+            f'        "technical_topics": [],\n'
+            f'        "coding_topics": [],\n'
+            f'        "aptitude_topics": [],\n'
+            f'        "hr_topics": [],\n'
+            f'        "likely_interview_rounds": []\n'
+            f'    }},\n'
+            f'    "workplace": {{\n'
+            f'        "company_culture": "",\n'
+            f'        "work_environment": "",\n'
+            f'        "career_growth": ""\n'
+            f'    }},\n'
+            f'    "data_confidence": {{\n'
+            f'        "overall": "",\n'
+            f'        "limitations": []\n'
+            f'    }}\n'
+            f"}}"
         )
-        raw = call_qwen(prompt, max_tokens=600, retries=1)
+        raw = call_qwen(prompt, max_tokens=1500, retries=2)
         if raw:
             data = parse_qwen_json(raw)
-            if data and data.get("overview"):
+            if data and data.get("company"):
                 return data
 
     return {
-        "overview":             f"{company_name} is a leading organisation in the {industry} industry.",
-        "culture":              "Collaborative and innovation-driven workplace.",
-        "interview_process":    "Technical screening → coding round → system design → HR interview.",
-        "growth_opportunities": "Strong mentorship programs and internal mobility paths.",
-        "work_life_balance":    "Flexible hours with remote and hybrid work options.",
-        "key_products":         [],
-        "headquarters":         "India",
+        "company": {
+            "name": company_name,
+            "industry": industry,
+            "description": description or f"{company_name} is a leading organisation."
+        },
+        "technology": {"tech_stack": []},
+        "career": {"important_skills": [], "freshers_roles": []},
+        "interview": {"likely_interview_topics": [], "technical_topics": []},
+        "workplace": {"company_culture": "Collaborative and innovation-driven workplace."},
+        "data_confidence": {"overall": "Low"}
     }
 
+def ensure_company_profile(company_name: str) -> dict:
+    """Ensure a company exists in the DB, generating an AI profile if missing."""
+    import json
+    import re
+    from database.db import query_db, execute_db
+    
+    name = company_name.strip()
+    if not name:
+        return None
+        
+    # Check if exists
+    company = query_db('SELECT * FROM companies WHERE name = %s', (name,), one=True)
+    if company:
+        return company
+        
+    # Generate profile
+    profile_data = analyze_company(name, "", "")
+    
+    # Extract basic info
+    comp_info = profile_data.get('company', {})
+    industry = comp_info.get('industry', 'Technology')
+    location = comp_info.get('headquarters', 'Global')
+    size = comp_info.get('company_size', '1000+')
+    description = comp_info.get('description', '')
+    
+    slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+    
+    # Insert new company
+    ai_profile_str = json.dumps(profile_data)
+    
+    company_id = execute_db(
+        '''INSERT INTO companies (name, slug, industry, location, company_size, description, ai_profile)
+           VALUES (%s, %s, %s, %s, %s, %s, %s)''',
+        (name, slug, industry, location, size, description, ai_profile_str),
+        get_id=True
+    )
+    
+    # Fetch and return
+    if company_id:
+        return query_db('SELECT * FROM companies WHERE id = %s', (company_id,), one=True)
+    
+    return None
 
 def extract_company_tech_stack(
     company_name: str,
@@ -1101,3 +1228,332 @@ def generate_career_report(user_data: dict, analyses: list) -> dict:
         "key_strengths":       ["Technical proficiency", "Communication skills", "Problem-solving ability"],
         "priority_improvements": ["System design knowledge", "Cloud computing skills", "Leadership experience"],
     }
+
+
+# ---------------------------------------------------------------------------
+# ── COMPANY INTELLIGENCE ─────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+
+def _build_company_profile_prompt(company_name: str) -> str:
+    """
+    Build the structured Qwen prompt for generating a company intelligence
+    profile.  Returns valid JSON matching the schema below — no markdown.
+    """
+    return f"""You are a company intelligence assistant for a career intelligence platform.
+
+The user has entered the following company name:
+
+COMPANY NAME:
+"{company_name}"
+
+Your task is to create a structured company profile that can be used
+for career guidance, resume analysis, skill matching and interview preparation.
+
+IMPORTANT RULES:
+
+1. Identify the company from the provided company name.
+
+2. Return ONLY valid JSON.
+
+3. Do NOT use markdown.
+
+4. Do NOT use ```json.
+
+5. Do NOT include explanations outside the JSON.
+
+6. Do not invent specific facts such as employee counts, salaries,
+   interview experiences, recruitment processes or technologies
+   unless they are reasonably supported by the available information.
+
+7. If a field cannot be determined reliably, return:
+   "Not available"
+
+8. Clearly distinguish general industry knowledge from
+   company-specific information.
+
+9. Technology information should contain technologies that are
+   reasonably associated with the company's products, services,
+   engineering or publicly known technology environment.
+
+10. Interview information must be presented as
+    "likely/relevant preparation topics", NOT as confirmed questions
+    actually asked by the company unless such information is explicitly
+    provided to you.
+
+11. Keep the information useful for a student/fresher preparing
+    for placements.
+
+12. Generate concise but useful information.
+
+RETURN EXACTLY THIS JSON STRUCTURE:
+
+{{
+    "company": {{
+        "name": "{company_name}",
+        "official_name": "",
+        "industry": "",
+        "sub_industry": "",
+        "headquarters": "",
+        "locations": [],
+        "website": "",
+        "description": "",
+        "products_services": [],
+        "company_type": "",
+        "company_size": "",
+        "founded_year": ""
+    }},
+
+    "technology": {{
+        "tech_stack": [],
+        "programming_languages": [],
+        "frameworks": [],
+        "databases": [],
+        "cloud_platforms": [],
+        "developer_tools": []
+    }},
+
+    "career": {{
+        "important_skills": [],
+        "common_job_roles": [],
+        "freshers_roles": [],
+        "relevant_domains": []
+    }},
+
+    "interview": {{
+        "likely_interview_topics": [],
+        "technical_topics": [],
+        "coding_topics": [],
+        "aptitude_topics": [],
+        "hr_topics": [],
+        "likely_interview_rounds": []
+    }},
+
+    "workplace": {{
+        "company_culture": "",
+        "work_environment": "",
+        "career_growth": ""
+    }},
+
+    "data_confidence": {{
+        "overall": "",
+        "limitations": []
+    }}
+}}"""
+
+
+def _company_profile_stub(company_name: str) -> dict:
+    """
+    Smart stub fallback for when Qwen is unavailable.
+    Returns a minimal but structurally valid profile.
+    """
+    return {
+        "company": {
+            "name": company_name,
+            "official_name": company_name,
+            "industry": "Technology",
+            "sub_industry": "Software",
+            "headquarters": "Not available",
+            "locations": [],
+            "website": "Not available",
+            "description": (
+                f"{company_name} is a technology company. "
+                "Detailed information could not be retrieved at this time."
+            ),
+            "products_services": ["Software solutions", "Technology services"],
+            "company_type": "Private",
+            "company_size": "Not available",
+            "founded_year": "Not available",
+        },
+        "technology": {
+            "tech_stack": ["Java", "Python", "JavaScript"],
+            "programming_languages": ["Java", "Python", "JavaScript", "C++"],
+            "frameworks": ["Spring Boot", "React", "Node.js"],
+            "databases": ["MySQL", "PostgreSQL"],
+            "cloud_platforms": ["AWS"],
+            "developer_tools": ["Git", "Docker"],
+        },
+        "career": {
+            "important_skills": [
+                "Data Structures & Algorithms", "Problem Solving",
+                "Communication", "Teamwork", "Object-Oriented Programming"
+            ],
+            "common_job_roles": [
+                "Software Engineer", "Backend Developer",
+                "Frontend Developer", "Full Stack Developer"
+            ],
+            "freshers_roles": ["Software Engineer Trainee", "Junior Developer"],
+            "relevant_domains": ["Software Development", "Web Development"],
+        },
+        "interview": {
+            "likely_interview_topics": [
+                "Data Structures", "Algorithms", "System Design basics",
+                "OOP Concepts", "Database fundamentals"
+            ],
+            "technical_topics": [
+                "Arrays, Linked Lists, Trees, Graphs",
+                "Sorting & Searching algorithms",
+                "OOP principles",
+                "SQL queries",
+            ],
+            "coding_topics": ["Array manipulation", "String problems", "Dynamic Programming"],
+            "aptitude_topics": ["Quantitative Aptitude", "Logical Reasoning", "Verbal Ability"],
+            "hr_topics": [
+                "Tell me about yourself",
+                "Why this company?",
+                "Where do you see yourself in 5 years?",
+                "Strengths and weaknesses",
+            ],
+            "likely_interview_rounds": [
+                "Online Aptitude Test",
+                "Technical Interview Round 1",
+                "Technical Interview Round 2",
+                "HR Interview",
+            ],
+        },
+        "workplace": {
+            "company_culture": "Collaborative and growth-oriented work environment.",
+            "work_environment": "Professional and structured.",
+            "career_growth": "Opportunities available based on performance and skills.",
+        },
+        "data_confidence": {
+            "overall": "Low — generated from stub fallback (Qwen unavailable)",
+            "limitations": [
+                "AI service was unavailable; data is generic.",
+                "Verify all information independently.",
+            ],
+        },
+    }
+
+
+def generate_company_profile(company_name: str) -> dict:
+    """
+    Generate a structured company intelligence profile using Qwen.
+
+    Returns a validated dict matching the schema defined in
+    _build_company_profile_prompt().  Falls back to _company_profile_stub()
+    when Qwen is unavailable or returns unparseable content.
+
+    Args:
+        company_name: The company name entered by the user.
+
+    Returns:
+        Dict with keys: company, technology, career, interview, workplace,
+        data_confidence.
+    """
+    from services.qwen_service import call_qwen, parse_qwen_json
+
+    prompt = _build_company_profile_prompt(company_name)
+
+    logger.info(f"COMPANY_AI: Generating profile for '{company_name}'")
+
+    raw = call_qwen(prompt, max_tokens=2000, retries=2, temperature=0.3)
+
+    if raw:
+        data = parse_qwen_json(raw)
+        if data and isinstance(data, dict) and data.get('company'):
+            # Basic validation: ensure required top-level keys exist
+            required_keys = {'company', 'technology', 'career', 'interview', 'workplace'}
+            if required_keys.issubset(data.keys()):
+                # Make sure company.name matches what was requested
+                data['company']['name'] = company_name
+                logger.info(f"COMPANY_AI: Profile generated successfully for '{company_name}'")
+                return data
+            else:
+                logger.warning(f"COMPANY_AI: Incomplete JSON keys for '{company_name}' — using stub")
+        else:
+            logger.warning(f"COMPANY_AI: Unparseable JSON for '{company_name}' — using stub")
+    else:
+        logger.warning(f"COMPANY_AI: No Qwen response for '{company_name}' — using stub")
+
+    return _company_profile_stub(company_name)
+
+
+def analyze_company(name: str, industry: str = '', description: str = '') -> dict:
+    """
+    Alias used by the existing /company/<slug>/generate-intelligence route.
+    Generates (or re-generates) the AI profile for an already-existing company.
+
+    Returns the same structured dict as generate_company_profile().
+    """
+    return generate_company_profile(name)
+
+
+def ensure_company_profile(company_name: str) -> dict | None:
+    """
+    Main orchestrator for the POST /api/company/search flow.
+
+    Flow:
+      1. Search MySQL for an existing company by name.
+      2a. Found + has ai_profile  → return cached company row.
+      2b. Found but no ai_profile → call Qwen, save ai_profile, return row.
+      2c. Not found               → call Qwen, create company + skills rows, return row.
+
+    Args:
+        company_name: Raw company name from user input.
+
+    Returns:
+        A company dict row (as returned by MySQL), or None on failure.
+    """
+    import json as _json
+    from models.company import CompanyModel
+
+    company_name = company_name.strip()
+    if not company_name:
+        return None
+
+    # ── Step 1: Check MySQL ──────────────────────────────────────────────
+    existing = CompanyModel.search_by_name(company_name)
+
+    if existing:
+        # ── Step 2a: Cached with ai_profile ─────────────────────────────
+        if existing.get('ai_profile'):
+            logger.info(f"COMPANY_AI: Cache hit for '{company_name}' (id={existing['id']})")
+            return existing
+
+        # ── Step 2b: Exists but no ai_profile ───────────────────────────
+        logger.info(f"COMPANY_AI: Found '{company_name}' in DB but no ai_profile — generating …")
+        try:
+            profile_data = generate_company_profile(company_name)
+            profile_json = _json.dumps(profile_data)
+
+            # Save ai_profile JSON
+            CompanyModel.update_ai_profile(existing['id'], profile_json)
+
+            # Refresh skills from AI data
+            technology = profile_data.get('technology', {})
+            if technology:
+                CompanyModel.save_skills_from_ai(existing['id'], technology)
+
+            # Re-fetch the updated row
+            return CompanyModel.get_by_id(existing['id'])
+        except Exception as exc:
+            logger.error(f"COMPANY_AI: Failed to update profile for existing company: {exc}")
+            return existing   # Return what we have even without ai_profile
+
+    # ── Step 2c: Not in DB — generate and create ─────────────────────────
+    logger.info(f"COMPANY_AI: '{company_name}' not in DB — generating new profile …")
+    try:
+        profile_data = generate_company_profile(company_name)
+        profile_json = _json.dumps(profile_data)
+
+        # Insert company row
+        new_company = CompanyModel.create_from_ai(profile_data, profile_json)
+        if not new_company:
+            logger.error(f"COMPANY_AI: DB insert failed for '{company_name}'")
+            return None
+
+        # Insert skills
+        technology = profile_data.get('technology', {})
+        if technology:
+            CompanyModel.save_skills_from_ai(new_company['id'], technology)
+
+        logger.info(
+            f"COMPANY_AI: Created new company '{company_name}' "
+            f"(id={new_company['id']}, slug={new_company['slug']})"
+        )
+        return new_company
+
+    except Exception as exc:
+        logger.error(f"COMPANY_AI: Failed to create new company '{company_name}': {exc}")
+        return None
+

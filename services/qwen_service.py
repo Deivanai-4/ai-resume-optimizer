@@ -69,8 +69,8 @@ def _make_client(token: str, provider: str):
         ) from exc
 
     if not provider or provider.lower() in ('auto', 'none', 'default'):
-        return InferenceClient(token=token, timeout=45)
-    return InferenceClient(token=token, provider=provider, timeout=45)
+        return InferenceClient(token=token, timeout=120)
+    return InferenceClient(token=token, provider=provider, timeout=120)
 
 
 def _strip_markdown_fences(text: str) -> str:
@@ -150,6 +150,8 @@ def call_qwen(
         - Token is never written to logs.
     """
     token, model, provider = _get_config()
+    with open("C:/Users/HP/Documents/2027-project/mini project-2/AI Career Intelligence Platform/qwen_debug.log", "a") as debug_f:
+        debug_f.write(f"[DEBUG] _get_config() returned token={bool(token)} model={model} provider={provider}\n")
 
     if not token:
         logger.warning(
@@ -189,6 +191,8 @@ def call_qwen(
         except Exception as exc:
             msg, should_retry = _classify_error(exc)
             logger.error(f"QWEN attempt {attempt}/{retries}: {msg}")
+            with open("C:/Users/HP/Documents/2027-project/mini project-2/AI Career Intelligence Platform/qwen_debug.log", "a") as debug_f:
+                debug_f.write(f"[DEBUG] Exception: {type(exc).__name__} - {str(exc)}\n")
             last_error = msg
 
             if not should_retry:

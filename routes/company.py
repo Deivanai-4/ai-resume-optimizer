@@ -1,4 +1,4 @@
-﻿"""Company Intelligence Blueprint."""
+"""Company Intelligence Blueprint."""
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from utils.decorators import login_required
 from utils.helpers import log_activity
@@ -46,13 +46,48 @@ def detail(slug):
     required_skills = CompanyModel.get_required_skills_list(company['id'])
     matched_skills = [s for s in required_skills if s.lower() in user_skills]
     match_percent = int((len(matched_skills) / max(len(required_skills), 1)) * 100)
+    
+    ai_profile_data = None
+    if company.get('ai_profile'):
+        import json
+        try:
+            ai_profile_data = json.loads(company['ai_profile'])
+        except:
+            pass
+            
     log_activity(user_id, 'company_view', f'Viewed company: {company["name"]}', 'company', company['id'])
     return render_template('company.html',
                            companies=CompanyModel.get_all(limit=8),
                            selected_company=company, skills=skills,
                            skills_by_category=skills_by_category, jobs=jobs,
                            resumes=resumes, company_analyses=company_analyses,
-                           matched_skills=matched_skills, match_percent=match_percent, search_query='')
+                           matched_skills=matched_skills, match_percent=match_percent, 
+                           ai_profile=ai_profile_data, search_query='')
+
+@company_bp.route('/company/<slug>/generate-intelligence', methods=['POST'])
+@login_required
+def generate_intelligence(slug):
+    company = CompanyModel.get_by_slug(slug)
+    if not company:
+        flash('Company not found.', 'danger')
+        return redirect(url_for('company.index'))
+        
+    from services.ai_service import analyze_company
+    from database.db import execute_db
+    import json
+    
+    try:
+        profile_data = analyze_company(company['name'], company.get('industry', ''), company.get('description', ''))
+        execute_db(
+            'UPDATE companies SET ai_profile=%s WHERE id=%s',
+            (json.dumps(profile_data), company['id'])
+        )
+        log_activity(session['user_id'], 'company_intelligence', f'Generated AI Profile for: {company["name"]}')
+        flash('AI Company Profile generated successfully!', 'success')
+    except Exception as e:
+        flash(f'Failed to generate AI profile: {str(e)[:150]}', 'danger')
+        
+    return redirect(url_for('company.detail', slug=slug, tab='intelligence'))
 
 
 @company_bp.route('/company/api/search')
@@ -64,12 +99,43 @@ def api_search():
                      'industry': c['industry'], 'location': c['location']} for c in companies])
 
 
-@company_bp.route('/company/api/custom', methods=['POST'])
+@company_bp.route('/api/company/search', methods=['POST'])
 @login_required
-def api_custom():
+def api_search_post():
     data = request.get_json(silent=True) or {}
-    name = (data.get('name') or request.form.get('name') or '').strip()
+    name = (data.get('company_name') or data.get('name') or request.form.get('company_name') or request.form.get('name') or '').strip()
     if not name:
         return jsonify({'success': False, 'message': 'Company name required'}), 400
-    log_activity(session['user_id'], 'company_custom', f'Used custom company: {name}')
-    return jsonify({'success': True, 'id': None, 'name': name})
+        
+    from services.ai_service import ensure_company_profile
+    import json
+    
+    try:
+        company = ensure_company_profile(name)
+        if company:
+            log_activity(session['user_id'], 'company_search_ai', f'Auto-generated/retrieved company: {company["name"]}')
+            
+            # Extract basic ai_profile if exists
+            ai_profile_data = None
+            if company.get('ai_profile'):
+                try:
+                    ai_profile_data = json.loads(company['ai_profile'])
+                except:
+                    pass
+                    
+            return jsonify({
+                'success': True,
+                'company': {
+                    'id': company['id'],
+                    'name': company['name'],
+                    'slug': company['slug'],
+                    'industry': company['industry'],
+                    'ai_profile': ai_profile_data
+                }
+            })
+        else:
+            return jsonify({'success': False, 'message': 'Failed to process company.'}), 500
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500

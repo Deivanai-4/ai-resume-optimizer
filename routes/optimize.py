@@ -8,6 +8,7 @@ from models.company import CompanyModel
 from models.analysis import AnalysisModel
 from database.db import execute_db, query_db
 from services.ai_service import optimize_resume
+from services.resume_parser import clean_resume_text
 
 optimize_bp = Blueprint('optimize', __name__)
 
@@ -30,6 +31,9 @@ def index():
         )
         if optimized:
             optimized['changes_list'] = parse_json_field(optimized.get('changes_made'))
+            # Clean up extracted text for display (fixes garbled PDF extraction)
+            if optimized.get('original_text'):
+                optimized['original_text'] = clean_resume_text(optimized['original_text'])
     
     return render_template('optimize.html',
                            resumes=resumes,

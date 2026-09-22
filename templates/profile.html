@@ -153,7 +153,7 @@
                             <label class="form-label" for="gender">Gender</label>
                             <select class="form-select" id="gender" name="gender">
                                 <option value="">Select gender</option>
-                                {% for g in ['Male','Female','Non-binary','Prefer not to say'] %}
+                                {% for g in ['Male','Female','Other','Prefer not to say'] %}
                                 <option value="{{ g }}" {{ 'selected' if profile and profile.gender==g else '' }}>{{ g
                                     }}</option>
                                 {% endfor %}

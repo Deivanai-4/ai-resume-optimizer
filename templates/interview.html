@@ -50,6 +50,56 @@
     {% endfor %}
 </div>
 
+<!-- ── TARGET ROLE & COMPANY INTELLIGENCE ───────────────────── -->
+{% if current_session and current_session.metadata %}
+<div class="card fade-in-up-delay-1" style="margin-bottom:var(--space-5); background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 100%); color: white; border: none;">
+    <div class="card-body">
+        <h3 style="margin-bottom:var(--space-4); color:white; font-size:var(--text-lg); display:flex; align-items:center; gap:var(--space-2);">
+            <i class="bi bi-building-fill-check" style="color:var(--primary-200);"></i> 
+            {{ current_session.metadata.company.name | default('Target Company') }} — {{ current_session.metadata.role.title | default('Target Role') }}
+        </h3>
+        
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:var(--space-4);">
+            <div style="background: rgba(255,255,255,0.1); padding: var(--space-4); border-radius: var(--radius-md);">
+                <h4 style="color:var(--primary-100); margin-bottom:var(--space-3); font-size:var(--text-xs); text-transform:uppercase; letter-spacing:0.05em;">🏢 Company Intelligence</h4>
+                <p style="font-size:var(--text-sm); margin-bottom:var(--space-3); line-height:1.5;"><strong>Culture:</strong> {{ current_session.metadata.company.company_culture | default('Not provided') }}</p>
+                {% if current_session.metadata.company.important_skills %}
+                <div style="font-size:var(--text-sm);"><strong>Important Skills:</strong>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+                    {% for skill in current_session.metadata.company.important_skills %}
+                        <span class="badge" style="background:rgba(255,255,255,0.2); color:white; border:none; padding:4px 8px;">{{ skill }}</span>
+                    {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            {% if current_session.metadata.role.responsibilities %}
+            <div style="background: rgba(255,255,255,0.1); padding: var(--space-4); border-radius: var(--radius-md);">
+                <h4 style="color:var(--primary-100); margin-bottom:var(--space-3); font-size:var(--text-xs); text-transform:uppercase; letter-spacing:0.05em;">🎯 Role Expectations</h4>
+                <ul style="font-size:var(--text-sm); padding-left:16px; margin:0; line-height:1.6; color:rgba(255,255,255,0.9);">
+                {% for resp in current_session.metadata.role.responsibilities[:4] %}
+                    <li>{{ resp }}</li>
+                {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            
+            {% if current_session.metadata.recommended_topics %}
+            <div style="background: rgba(255,255,255,0.1); padding: var(--space-4); border-radius: var(--radius-md);">
+                <h4 style="color:var(--primary-100); margin-bottom:var(--space-3); font-size:var(--text-xs); text-transform:uppercase; letter-spacing:0.05em;">📚 Recommended Topics</h4>
+                <ul style="font-size:var(--text-sm); padding-left:16px; margin:0; line-height:1.6; color:rgba(255,255,255,0.9);">
+                {% for topic in current_session.metadata.recommended_topics[:4] %}
+                    <li><strong style="color:white;">{{ topic.topic }}</strong>: {{ topic.reason }}</li>
+                {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- ── AI GENERATED QUESTIONS ──────────────────────────────── -->
 {% if questions %}
 <div class="card fade-in-up-delay-2" style="margin-bottom:var(--space-5);">
@@ -81,9 +131,20 @@
             </div>
             {% endif %}
             <!-- Textarea for user answer -->
+            {% if q.options_list %}
+            <div class="aptitude-options" style="margin-top:var(--space-4); display:flex; flex-direction:column; gap:var(--space-2);">
+                {% for opt in q.options_list %}
+                <label style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); cursor:pointer; transition:all 0.2s;" class="apt-option-label">
+                    <input type="radio" name="q_{{ q.id }}" value="{{ opt }}" {% if q.user_answer == opt %}checked{% endif %} onchange="saveAnswer({{ q.id }}, this.value)" style="accent-color:var(--primary); transform:scale(1.2);">
+                    <span style="font-size:var(--text-sm); color:var(--text-1);">{{ opt }}</span>
+                </label>
+                {% endfor %}
+            </div>
+            {% else %}
             <textarea class="form-control" style="margin-top:var(--space-3);" rows="3"
                       placeholder="Enter your answer here..."
                       onchange="saveAnswer({{ q.id }}, this.value)">{{ q.user_answer or '' }}</textarea>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
@@ -101,6 +162,10 @@
 </div>
 {% endif %}
 
+</div><!-- stagger-children -->
+{% endblock %}
+
+{% block modals %}
 <!-- ── MCQ TEST MODAL ─────────────────────────────────────── -->
 <div id="mcqModal" style="display:none; position:fixed; inset:0; z-index:var(--z-modal); background:var(--bg); overflow-y:auto;">
     <div style="max-width:1100px; margin:0 auto; padding:var(--space-5);">
@@ -249,8 +314,6 @@
         </form>
     </div>
 </div>
-
-</div><!-- stagger-children -->
 {% endblock %}
 
 {% block scripts %}

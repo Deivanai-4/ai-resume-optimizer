@@ -72,6 +72,21 @@ def execute_db(sql, args=(), get_id=False):
         cursor.close()
 
 
+def execute_many_db(sql, args_list):
+    """Execute a write query (INSERT/UPDATE/DELETE) with multiple sets of arguments."""
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    try:
+        cursor.executemany(sql, args_list)
+        db.commit()
+        return cursor.rowcount
+    except mysql.connector.Error as err:
+        db.rollback()
+        current_app.logger.error(f"Execute many error: {err} | SQL: {sql}")
+        raise
+    finally:
+        cursor.close()
+
 def init_app(app):
     """Register database teardown with the Flask app."""
     app.teardown_appcontext(close_db)

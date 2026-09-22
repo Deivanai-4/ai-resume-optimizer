@@ -5,7 +5,7 @@ from utils.helpers import log_activity, parse_json_field
 from models.company import CompanyModel
 from models.resume import ResumeModel
 from models.analysis import AnalysisModel
-from database.db import execute_db, query_db
+from database.db import execute_db, query_db, execute_many_db
 from services.ai_service import generate_interview_questions
 
 interview_bp = Blueprint('interview', __name__)
@@ -26,30 +26,50 @@ def index():
     
     if session_id:
         current_session = query_db(
-            'SELECT * FROM interview_questions WHERE user_id=%s AND id=%s',
+            'SELECT * FROM interview_sessions WHERE user_id=%s AND id=%s',
             (user_id, session_id), one=True
         )
+        if current_session and current_session.get('session_metadata'):
+            import json
+            try:
+                current_session['metadata'] = json.loads(current_session['session_metadata'])
+            except:
+                pass
+                
         questions = query_db(
             '''SELECT * FROM interview_questions 
-               WHERE user_id=%s AND company_id <=> (
-                   SELECT company_id FROM interview_questions WHERE id=%s LIMIT 1
-               )
+               WHERE user_id=%s AND session_id=%s
                ORDER BY category, difficulty, id''',
             (user_id, session_id)
         )
     else:
         # Load most recent session
-        latest = query_db(
-            'SELECT DISTINCT company_id, created_at FROM interview_questions WHERE user_id=%s ORDER BY created_at DESC LIMIT 1',
+        latest_session = query_db(
+            'SELECT * FROM interview_sessions WHERE user_id=%s ORDER BY created_at DESC LIMIT 1',
             (user_id,), one=True
         )
-        if latest:
-            company_id = latest['company_id']
+        if latest_session:
+            current_session = latest_session
+            if current_session and current_session.get('session_metadata'):
+                import json
+                try:
+                    current_session['metadata'] = json.loads(current_session['session_metadata'])
+                except:
+                    pass
             questions = query_db(
-                'SELECT * FROM interview_questions WHERE user_id=%s AND company_id <=> %s ORDER BY category, difficulty',
-                (user_id, company_id)
+                'SELECT * FROM interview_questions WHERE user_id=%s AND session_id=%s ORDER BY category, difficulty',
+                (user_id, current_session['id'])
             )
-    
+            
+    # Parse options JSON for template
+    for q in questions:
+        if q.get('options'):
+            import json
+            try:
+                q['options_list'] = json.loads(q['options'])
+            except:
+                q['options_list'] = []
+
     # Stats
     total_questions = query_db(
         'SELECT COUNT(*) as cnt FROM interview_questions WHERE user_id=%s',
@@ -60,6 +80,7 @@ def index():
                            companies=companies,
                            resumes=resumes,
                            questions=questions,
+                           current_session=current_session,
                            total_questions=total_questions['cnt'] if total_questions else 0)
 
 
@@ -111,7 +132,7 @@ def generate():
     seen_questions = {row['question'].strip().lower() for row in (prev_questions or [])}
 
     try:
-        questions = generate_interview_questions(
+        response = generate_interview_questions(
             job_title=job_title,
             company_name=company_name,
             company_skills=company_skills,
@@ -123,32 +144,50 @@ def generate():
             user_projects=[dict(p) for p in (user_projects or [])],
             job_description=resume_text[:600],
         )
+        
+        questions = response.get("questions", [])
 
         # Filter by difficulty if specified
         if difficulty and difficulty != 'All':
             filtered = [q for q in questions if q.get('diff', 'Medium').lower() == difficulty.lower()]
             questions = filtered if filtered else questions
 
-        first_id = None
-        saved_count = 0
+        import json
+        session_metadata = {
+            "company": response.get("company", {}),
+            "role": response.get("role", {}),
+            "recommended_topics": response.get("recommended_topics", [])
+        }
+        session_id = execute_db(
+            '''INSERT INTO interview_sessions (user_id, company_id, resume_id, session_metadata) VALUES (%s,%s,%s,%s)''',
+            (user_id, company_id if company_id else None, resume_id if resume_id else None, json.dumps(session_metadata)),
+            get_id=True
+        )
+
+        args_list = []
         for q in questions:
-            q_id = execute_db(
-                '''INSERT INTO interview_questions (user_id, company_id, resume_id, question, answer,
-                   category, difficulty, ai_tip)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s)''',
-                (user_id, company_id, resume_id, q['q'], '',
-                 q.get('cat', 'Technical'), q.get('diff', difficulty if difficulty != 'All' else 'Medium'),
-                 q.get('tip', '')),
-                get_id=True
+            options_json = json.dumps(q.get('options', [])) if q.get('options') else None
+            correct_answer = q.get('correct_answer', '')
+            args_list.append((
+                user_id, company_id if company_id else None, resume_id if resume_id else None, session_id, q['q'], '',
+                q.get('cat', 'Technical'), q.get('diff', difficulty if difficulty != 'All' else 'Medium'),
+                q.get('tip', ''), options_json, correct_answer
+            ))
+            
+        if args_list:
+            saved_count = execute_many_db(
+                '''INSERT INTO interview_questions (user_id, company_id, resume_id, session_id, question, answer,
+                   category, difficulty, ai_tip, options, correct_answer)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',
+                args_list
             )
-            if not first_id:
-                first_id = q_id
-            saved_count += 1
+        else:
+            saved_count = 0
 
         log_activity(user_id, 'interview_generate',
                      f'Generated {saved_count} {difficulty} interview questions for {job_title} at {company_name}')
         flash(f'{saved_count} fresh interview questions generated for {job_title}! 🎯', 'success')
-        return redirect(url_for('interview.index', session_id=first_id))
+        return redirect(url_for('interview.index', session_id=session_id))
 
     except Exception as e:
         flash(f'Failed to generate questions. Please try again. Error: {str(e)[:150]}', 'danger')

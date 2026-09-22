@@ -140,8 +140,6 @@ function renderProgressRing(container, value, opts = {}) {
     const showPct = opts.showPct !== false;
     const animate = opts.animate !== false;
     const radius  = (size - stroke) / 2;
-    const circ    = 2 * Math.PI * radius;
-    const offset  = circ - (value / 100) * circ;
     const sizeClass = opts.sizeClass || '';
 
     container.innerHTML = `
@@ -152,10 +150,11 @@ function renderProgressRing(container, value, opts = {}) {
                     cx="${size/2}" cy="${size/2}" r="${radius}"
                     stroke-width="${stroke}"
                     stroke="${color}"
-                    stroke-dasharray="${circ}"
-                    stroke-dashoffset="${animate ? circ : offset}"
-                    data-target-offset="${offset}"
-                    style="--ring-circumference:${circ}"
+                    pathLength="100"
+                    stroke-dasharray="100"
+                    stroke-dashoffset="${animate ? 100 : 100 - value}"
+                    data-target-offset="${100 - value}"
+                    style="--ring-circumference:100"
                 />
             </svg>
             <div class="progress-ring-text">
@@ -173,7 +172,7 @@ function renderProgressRing(container, value, opts = {}) {
                 const fill = container.querySelector('.progress-ring-fill');
                 if (fill) {
                     fill.style.transition = 'stroke-dashoffset 1s cubic-bezier(0.34, 1.56, 0.64, 1)';
-                    fill.style.strokeDashoffset = offset;
+                    fill.style.strokeDashoffset = 100 - value;
                 }
                 const val = container.querySelector('[data-count-to]');
                 if (val) animateCount(val, 0, value, 1000);

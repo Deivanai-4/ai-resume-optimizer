@@ -38,7 +38,7 @@ def update_basic():
         'full_name': request.form.get('full_name', '').strip(),
         'phone': request.form.get('phone', '').strip(),
         'date_of_birth': request.form.get('date_of_birth') or None,
-        'gender': request.form.get('gender', ''),
+        'gender': request.form.get('gender') or None,
         'location': request.form.get('location', '').strip(),
         'career_objective': request.form.get('career_objective', '').strip()
     }

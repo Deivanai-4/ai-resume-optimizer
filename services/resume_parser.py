@@ -62,8 +62,69 @@ KNOWN_SKILLS = {
 }
 
 
+def clean_resume_text(text):
+    """Normalize extracted resume text: collapse internal spaces, remove separators."""
+    if not text:
+        return text
+    result = []
+    blank_count = 0
+    for line in text.splitlines():
+        # Collapse multiple internal spaces/tabs into a single space
+        line = re.sub(r'[ \t]{2,}', ' ', line).strip()
+        # Drop lines that are only separator characters (dots, dashes, underscores, pipes)
+        if re.fullmatch(r'[.\-_|=\s*]+', line):
+            continue
+        if line == '':
+            blank_count += 1
+            if blank_count <= 1:  # allow at most one blank line between sections
+                result.append('')
+        else:
+            blank_count = 0
+            result.append(line)
+    return '\n'.join(result).strip()
+
+
 def extract_text_from_pdf(file_path):
-    """Extract text from a PDF file. Tries pypdf first, falls back to PyPDF2."""
+    """Extract text from a PDF file. Tries pdfplumber first, falls back to pypdf."""
+    # Use extract_words() to avoid internal-space issues from two-column PDF layouts
+    try:
+        import pdfplumber
+        from itertools import groupby
+        all_lines = []
+        with pdfplumber.open(file_path) as pdf:
+            for page in pdf.pages:
+                try:
+                    words = page.extract_words(
+                        x_tolerance=3,
+                        y_tolerance=3,
+                        keep_blank_chars=False,
+                        use_text_flow=True,
+                    )
+                except Exception:
+                    words = []
+                if not words:
+                    # Fallback to basic extract_text for this page
+                    page_text = page.extract_text()
+                    if page_text:
+                        all_lines.append(page_text)
+                    continue
+                # Group words into visual lines by rounded y-coordinate
+                words_sorted = sorted(
+                    words, key=lambda w: (round(w['top'] / 5) * 5, w['x0'])
+                )
+                for _, group in groupby(
+                    words_sorted, key=lambda w: round(w['top'] / 5) * 5
+                ):
+                    line_words = list(group)
+                    line_text = ' '.join(w['text'] for w in line_words).strip()
+                    if line_text:
+                        all_lines.append(line_text)
+        return clean_resume_text('\n'.join(all_lines))
+    except ImportError:
+        pass
+    except Exception as e:
+        print(f"pdfplumber extraction failed: {e}")  # Fallback to pypdf
+
     # Try pypdf (modern, preferred)
     try:
         from pypdf import PdfReader
@@ -74,7 +135,7 @@ def extract_text_from_pdf(file_path):
                 page_text = page.extract_text()
                 if page_text:
                     text.append(page_text)
-        return '\n'.join(text)
+        return clean_resume_text('\n'.join(text))
     except ImportError:
         pass
     except Exception as e:
@@ -89,7 +150,7 @@ def extract_text_from_pdf(file_path):
                 page_text = page.extract_text()
                 if page_text:
                     text.append(page_text)
-        return '\n'.join(text)
+        return clean_resume_text('\n'.join(text))
     except Exception as e:
         return f"[Error extracting PDF text: {str(e)}]"
 

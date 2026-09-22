@@ -13,6 +13,18 @@ def create_app(config_name="default"):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
 
+    # Explicitly set Flask's secret_key directly from the environment.
+    # This is the authoritative assignment — Flask uses app.secret_key (which
+    # maps to app.config['SECRET_KEY']) to sign session cookies. An empty or
+    # missing value raises RuntimeError on the first session write.
+    _secret = os.environ.get('SECRET_KEY') or app.config.get('SECRET_KEY')
+    if not _secret:
+        raise ValueError(
+            "SECRET_KEY environment variable is not set. "
+            "Set it in your Render dashboard (or .env for local dev) "
+            "before starting the application."
+        )
+    app.secret_key = _secret
     # Create Upload Folders
     upload_base = app.config["UPLOAD_FOLDER"]
     for folder in ["resumes", "photos", "reports"]:
