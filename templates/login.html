@@ -1,57 +1,304 @@
-{% extends "auth_base.html" %}
-{% block title %}Login — AI Career Intelligence Platform{% endblock %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — AI Career Intelligence Platform</title>
+    <meta name="description" content="Sign in to AI CareerIQ – your AI-powered career intelligence platform.">
 
-{% block content %}
-<div class="fade-in-up">
-    <h1 class="auth-title" style="text-align:center; font-size:2rem; font-weight:700; color:#111;">Welcome back</h1>
-    <p class="auth-sub" style="text-align:center; color:#444; margin-bottom:2rem;">Sign in to your account to continue your career journey.</p>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0d0d1a;
+            overflow: hidden;
+        }
+
+        .bg-blobs {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+        }
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.55;
+            animation: blobFloat 8s ease-in-out infinite alternate;
+        }
+        .blob-1 { width: 520px; height: 520px; background: #7c3aed; top: -10%; left: -10%; animation-delay: 0s; }
+        .blob-2 { width: 420px; height: 420px; background: #06b6d4; bottom: -10%; right: -5%; animation-delay: 2s; }
+        .blob-3 { width: 300px; height: 300px; background: #4f46e5; top: 40%; left: 35%; animation-delay: 4s; }
+        .blob-4 { width: 250px; height: 250px; background: #a855f7; bottom: 15%; left: 10%; animation-delay: 1s; }
+
+        @keyframes blobFloat {
+            from { transform: translate(0, 0) scale(1); }
+            to   { transform: translate(30px, 20px) scale(1.08); }
+        }
+
+        .login-card {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 440px;
+            background: rgba(255, 255, 255, 0.10);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 24px;
+            padding: 2.75rem 2.5rem 2.5rem;
+            box-shadow: 0 32px 64px rgba(0, 0, 0, 0.5);
+            animation: cardIn 0.55s cubic-bezier(0.22,1,0.36,1) both;
+        }
+
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(40px) scale(0.97); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .logo-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            margin-bottom: 2rem;
+            text-decoration: none;
+        }
+        .logo-icon {
+            width: 38px; height: 38px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #06b6d4, #4f46e5);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem; color: #fff;
+            box-shadow: 0 0 14px rgba(6,182,212,0.5);
+        }
+        .logo-name {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.01em;
+        }
+
+        .card-heading {
+            text-align: center;
+            margin-bottom: 0.5rem;
+            font-size: 1.55rem;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: -0.02em;
+        }
+        .card-sub {
+            text-align: center;
+            font-size: 0.88rem;
+            color: rgba(255,255,255,0.6);
+            margin-bottom: 2rem;
+        }
+
+        .field-group { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.25rem; }
+
+        .input-wrap { position: relative; }
+        .input-wrap .icon-left {
+            position: absolute; left: 1rem; top: 50%; transform: translateY(-50%);
+            color: rgba(255,255,255,0.5); font-size: 1rem; pointer-events: none;
+        }
+        .auth-input {
+            width: 100%;
+            height: 48px;
+            padding: 0 1rem 0 2.75rem;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 100px;
+            color: #fff;
+            font-size: 0.92rem;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .auth-input::placeholder { color: rgba(255,255,255,0.4); }
+        .auth-input:focus {
+            border-color: rgba(6,182,212,0.7);
+            box-shadow: 0 0 0 3px rgba(6,182,212,0.18);
+            background: rgba(255,255,255,0.12);
+        }
+        .auth-input.has-right { padding-right: 3rem; }
+
+        .toggle-eye {
+            position: absolute; right: 0; top: 0;
+            width: 48px; height: 48px;
+            background: transparent; border: none; cursor: pointer;
+            color: rgba(255,255,255,0.5);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1rem;
+        }
+        .toggle-eye:hover { color: #fff; }
+
+        .forgot-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 0.35rem;
+        }
+        .forgot-link {
+            font-size: 0.8rem;
+            color: #06b6d4;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .forgot-link:hover { text-decoration: underline; }
+
+        .btn-signin {
+            width: 100%;
+            height: 48px;
+            border: none;
+            border-radius: 100px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            background: linear-gradient(90deg, #4f46e5, #06b6d4);
+            color: #fff;
+            letter-spacing: 0.01em;
+            box-shadow: 0 4px 18px rgba(79,70,229,0.4);
+            transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+            margin-top: 1.25rem;
+        }
+        .btn-signin:hover {
+            opacity: 0.92;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 24px rgba(79,70,229,0.55);
+        }
+        .btn-signin:active { transform: translateY(0); }
+
+        .divider {
+            display: flex; align-items: center; gap: 0.75rem;
+            margin: 1.4rem 0;
+            color: rgba(255,255,255,0.4);
+            font-size: 0.82rem;
+        }
+        .divider::before, .divider::after {
+            content: ''; flex: 1;
+            height: 1px;
+            background: rgba(255,255,255,0.15);
+        }
+
+        .card-footer {
+            text-align: center;
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.55);
+        }
+        .card-footer a {
+            color: #06b6d4;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .card-footer a:hover { text-decoration: underline; }
+
+        .flash-msg {
+            background: rgba(239,68,68,0.15);
+            border: 1px solid rgba(239,68,68,0.35);
+            color: #fca5a5;
+            border-radius: 12px;
+            padding: 0.65rem 1rem;
+            font-size: 0.85rem;
+            margin-bottom: 1.25rem;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .flash-msg.success {
+            background: rgba(16,185,129,0.15);
+            border-color: rgba(16,185,129,0.35);
+            color: #6ee7b7;
+        }
+    </style>
+</head>
+<body>
+
+<div class="bg-blobs">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+    <div class="blob blob-4"></div>
+</div>
+
+<div class="login-card">
+
+    <a href="{{ url_for('index') }}" class="logo-row">
+        <div class="logo-icon">
+            <i class="bi bi-cpu-fill"></i>
+        </div>
+        <span class="logo-name">AI CareerIQ</span>
+    </a>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash-msg {% if category == 'success' %}success{% endif %}">
+            <i class="bi bi-{% if category == 'success' %}check-circle{% else %}exclamation-circle{% endif %}"></i>
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <h1 class="card-heading">Welcome back to AI CareerIQ</h1>
+    <p class="card-sub">Sign in to manage your career journey efficiently.</p>
 
     <form action="{{ url_for('auth.login') }}" method="POST" id="loginForm">
-        <div style="display:flex; flex-direction:column; gap:1.25rem; margin-bottom:1.5rem;">
-            <div>
-                <label class="form-label" for="email" style="color:#111; font-weight:600; margin-bottom:0.25rem;">Email</label>
-                <div class="input-icon-wrap" style="position:relative;">
-                    <i class="bi bi-envelope" style="position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:#666;"></i>
-                    <input type="email" class="form-control auth-input" id="email" name="email"
-                           required autocomplete="email" placeholder="Enter your email address"
-                           value="{{ request.form.get('email', '') }}"
-                           style="padding-left:2.75rem; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.8); color:#111; border-radius:100px; height:48px;">
-                </div>
+        <div class="field-group">
+            <div class="input-wrap">
+                <i class="bi bi-envelope icon-left"></i>
+                <input
+                    type="email"
+                    class="auth-input"
+                    id="email"
+                    name="email"
+                    required
+                    autocomplete="email"
+                    placeholder="Email Address"
+                    value="{{ request.form.get('email', '') }}"
+                >
             </div>
+
             <div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
-                    <label class="form-label" for="password" style="margin:0; color:#111; font-weight:600;">Password</label>
-                    <a href="{{ url_for('auth.forgot_password') }}" style="font-size:0.8rem; color:#4F46E5; text-decoration:none; font-weight:500;">Forgot password?</a>
-                </div>
-                <div class="input-icon-wrap" style="position:relative; border-radius:100px; overflow:hidden;">
-                    <i class="bi bi-lock" style="position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:#666; z-index:2; pointer-events:none;"></i>
-                    <input type="password" class="form-control auth-input" id="password" name="password"
-                           required autocomplete="current-password" placeholder="Enter your password"
-                           style="padding-left:2.75rem; padding-right:3.25rem; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.8); color:#111; border-radius:100px; height:48px; position:relative; z-index:1;">
-                    <button type="button" onclick="togglePass('password', 'eyeIcon')"
-                            style="position:absolute; right:0; top:0; height:48px; width:48px; background:transparent; border:none; cursor:pointer; color:#555; display:flex; align-items:center; justify-content:center; z-index:3;">
+                <div class="input-wrap">
+                    <i class="bi bi-lock icon-left"></i>
+                    <input
+                        type="password"
+                        class="auth-input has-right"
+                        id="password"
+                        name="password"
+                        required
+                        autocomplete="current-password"
+                        placeholder="Password"
+                    >
+                    <button type="button" class="toggle-eye" onclick="togglePass('password','eyeIcon')" aria-label="Toggle password visibility">
                         <i class="bi bi-eye" id="eyeIcon"></i>
                     </button>
+                </div>
+                <div class="forgot-row">
+                    <a href="{{ url_for('auth.forgot_password') }}" class="forgot-link">Forgot password?</a>
                 </div>
             </div>
         </div>
 
-        <button type="submit" class="btn w-100" style="height:48px; border-radius:100px; font-weight:600; background:linear-gradient(to right, #00c6ff, #0072ff); color:white; border:none; box-shadow:0 4px 15px rgba(0, 114, 255, 0.3);">
-            Sign In <i class="bi bi-arrow-right ms-1"></i>
-        </button>
+        <button type="submit" class="btn-signin" id="signInBtn">Sign In</button>
     </form>
 
-    <div class="divider-text" style="margin:1.5rem 0; color:#111;">
-        Don't have an account?
-    </div>
+    <div class="divider">or</div>
 
-    <a href="{{ url_for('auth.register') }}" class="btn w-100" style="height:48px; border-radius:100px; font-weight:600; background:transparent; border:1.5px solid #fff; color:#fff; display:flex; align-items:center; justify-content:center; gap:0.5rem; text-decoration:none;">
-        <i class="bi bi-person-plus"></i> Create Account
-    </a>
+    <p class="card-footer">
+        Don't have an account? <a href="{{ url_for('auth.register') }}">Sign up here</a>
+    </p>
 </div>
-{% endblock %}
 
-{% block scripts %}
 <script>
 function togglePass(id, iconId) {
     const inp = document.getElementById(id);
@@ -65,4 +312,6 @@ function togglePass(id, iconId) {
     }
 }
 </script>
-{% endblock %}
+
+</body>
+</html>
