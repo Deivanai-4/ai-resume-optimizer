@@ -77,9 +77,14 @@ def register():
         try:
             user_id = UserModel.create(full_name, email, password)
             
-            # Initialize profile and settings
-            ProfileModel.create_default(user_id)
-            execute_db('INSERT INTO settings (user_id) VALUES (%s)', (user_id,))
+            # Initialize profile and settings — if either fails, clean up the orphaned user row
+            try:
+                ProfileModel.create_default(user_id)
+                execute_db('INSERT INTO settings (user_id) VALUES (%s)', (user_id,))
+            except Exception as setup_err:
+                current_app.logger.error(f"Post-user setup failed for user_id={user_id}: {setup_err}")
+                execute_db('DELETE FROM users WHERE id = %s', (user_id,))
+                raise
             
             session['user_id'] = user_id
             session['user_name'] = full_name

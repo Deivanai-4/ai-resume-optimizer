@@ -1,114 +1,426 @@
-{% extends "auth_base.html" %}
-{% block title %}Create Account — AI Career Intelligence Platform{% endblock %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account — AI CareerIQ</title>
+    <meta name="description" content="Create your AI CareerIQ account and start your AI-powered career journey.">
 
-{% block content %}
-<div class="fade-in-up">
-    <h1 class="auth-title" style="text-align:center; font-size:2rem; font-weight:700; color:#111;">Create your account</h1>
-    <p class="auth-sub" style="text-align:center; color:#444; margin-bottom:2rem;">Join thousands of students using AI to land their dream job.</p>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0d0d1a;
+            overflow-x: hidden;
+            padding: 2rem 1rem;
+        }
+
+        /* ── Animated background blobs ── */
+        .bg-blobs {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+        }
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.55;
+            animation: blobFloat 8s ease-in-out infinite alternate;
+        }
+        .blob-1 { width: 520px; height: 520px; background: #7c3aed; top: -10%; left: -10%; animation-delay: 0s; }
+        .blob-2 { width: 420px; height: 420px; background: #06b6d4; bottom: -10%; right: -5%; animation-delay: 2s; }
+        .blob-3 { width: 300px; height: 300px; background: #4f46e5; top: 40%; left: 35%; animation-delay: 4s; }
+        .blob-4 { width: 250px; height: 250px; background: #a855f7; bottom: 15%; left: 10%; animation-delay: 1s; }
+
+        @keyframes blobFloat {
+            from { transform: translate(0, 0) scale(1); }
+            to   { transform: translate(30px, 20px) scale(1.08); }
+        }
+
+        /* ── Card ── */
+        .register-card {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 460px;
+            background: rgba(255, 255, 255, 0.10);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 24px;
+            padding: 2.75rem 2.5rem 2.5rem;
+            box-shadow: 0 32px 64px rgba(0, 0, 0, 0.5);
+            animation: cardIn 0.55s cubic-bezier(0.22,1,0.36,1) both;
+        }
+
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(40px) scale(0.97); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* ── Logo ── */
+        .logo-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            margin-bottom: 2rem;
+            text-decoration: none;
+        }
+        .logo-icon {
+            width: 38px; height: 38px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #06b6d4, #4f46e5);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem; color: #fff;
+            box-shadow: 0 0 14px rgba(6,182,212,0.5);
+        }
+        .logo-name {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.01em;
+        }
+
+        /* ── Headings ── */
+        .card-heading {
+            text-align: center;
+            margin-bottom: 0.5rem;
+            font-size: 1.55rem;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: -0.02em;
+        }
+        .card-sub {
+            text-align: center;
+            font-size: 0.88rem;
+            color: rgba(255,255,255,0.6);
+            margin-bottom: 2rem;
+        }
+
+        /* ── Fields ── */
+        .field-group { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.25rem; }
+
+        .field-label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.75);
+            margin-bottom: 0.35rem;
+        }
+
+        .input-wrap { position: relative; }
+        .input-wrap .icon-left {
+            position: absolute; left: 1rem; top: 50%; transform: translateY(-50%);
+            color: rgba(255,255,255,0.5); font-size: 1rem; pointer-events: none;
+        }
+        .auth-input {
+            width: 100%;
+            height: 48px;
+            padding: 0 1rem 0 2.75rem;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 100px;
+            color: #fff;
+            font-size: 0.92rem;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .auth-input::placeholder { color: rgba(255,255,255,0.4); }
+        .auth-input:focus {
+            border-color: rgba(6,182,212,0.7);
+            box-shadow: 0 0 0 3px rgba(6,182,212,0.18);
+            background: rgba(255,255,255,0.12);
+        }
+        .auth-input.has-right { padding-right: 3rem; }
+
+        /* ── Eye toggle ── */
+        .toggle-eye {
+            position: absolute; right: 0; top: 0;
+            width: 48px; height: 48px;
+            background: transparent; border: none; cursor: pointer;
+            color: rgba(255,255,255,0.5);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1rem;
+        }
+        .toggle-eye:hover { color: #fff; }
+
+        /* ── Strength bar ── */
+        .strength-track {
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .strength-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 10px;
+            transition: width 0.3s, background 0.3s;
+        }
+        .strength-label {
+            font-size: 0.72rem;
+            color: rgba(255,255,255,0.5);
+            margin-top: 4px;
+        }
+
+        /* ── Terms ── */
+        .terms-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.65rem;
+            padding: 0 0.25rem;
+        }
+        .terms-row input[type="checkbox"] {
+            margin-top: 3px;
+            flex-shrink: 0;
+            accent-color: #06b6d4;
+            width: 15px; height: 15px;
+            cursor: pointer;
+        }
+        .terms-row label {
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.55);
+            cursor: pointer;
+            line-height: 1.5;
+        }
+        .terms-row a { color: #06b6d4; text-decoration: none; font-weight: 500; }
+        .terms-row a:hover { text-decoration: underline; }
+
+        /* ── Submit button ── */
+        .btn-submit {
+            width: 100%;
+            height: 48px;
+            border: none;
+            border-radius: 100px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            background: linear-gradient(90deg, #4f46e5, #06b6d4);
+            color: #fff;
+            letter-spacing: 0.01em;
+            box-shadow: 0 4px 18px rgba(79,70,229,0.4);
+            transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+            margin-top: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+        }
+        .btn-submit:hover {
+            opacity: 0.92;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 24px rgba(79,70,229,0.55);
+        }
+        .btn-submit:active { transform: translateY(0); }
+
+        /* ── Divider ── */
+        .divider {
+            display: flex; align-items: center; gap: 0.75rem;
+            margin: 1.4rem 0;
+            color: rgba(255,255,255,0.4);
+            font-size: 0.82rem;
+        }
+        .divider::before, .divider::after {
+            content: ''; flex: 1;
+            height: 1px;
+            background: rgba(255,255,255,0.15);
+        }
+
+        /* ── Footer ── */
+        .card-footer-text {
+            text-align: center;
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.55);
+        }
+        .card-footer-text a {
+            color: #06b6d4;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .card-footer-text a:hover { text-decoration: underline; }
+
+        /* ── Flash messages ── */
+        .flash-msg {
+            background: rgba(239,68,68,0.15);
+            border: 1px solid rgba(239,68,68,0.35);
+            color: #fca5a5;
+            border-radius: 12px;
+            padding: 0.65rem 1rem;
+            font-size: 0.85rem;
+            margin-bottom: 1.25rem;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .flash-msg.success {
+            background: rgba(16,185,129,0.15);
+            border-color: rgba(16,185,129,0.35);
+            color: #6ee7b7;
+        }
+        .flash-msg.warning {
+            background: rgba(245,158,11,0.15);
+            border-color: rgba(245,158,11,0.35);
+            color: #fcd34d;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Animated background blobs -->
+<div class="bg-blobs">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+    <div class="blob blob-4"></div>
+</div>
+
+<div class="register-card">
+
+    <!-- Logo -->
+    <a href="{{ url_for('index') }}" class="logo-row">
+        <div class="logo-icon">
+            <i class="bi bi-cpu-fill"></i>
+        </div>
+        <span class="logo-name">AI CareerIQ</span>
+    </a>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash-msg {{ category if category in ['success','warning'] else '' }}">
+            <i class="bi bi-{% if category == 'success' %}check-circle{% elif category == 'warning' %}exclamation-triangle{% else %}exclamation-circle{% endif %}"></i>
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <h1 class="card-heading">Create your account</h1>
+    <p class="card-sub">Join thousands of students using AI to land their dream job.</p>
 
     <form action="{{ url_for('auth.register') }}" method="POST" id="registerForm">
-        <div style="display:flex; flex-direction:column; gap:1.25rem; margin-bottom:1.5rem;">
+        <div class="field-group">
+
+            <!-- Full Name -->
             <div>
-                <label class="form-label" for="full_name" style="color:#111; font-weight:600; margin-bottom:0.25rem;">Full Name</label>
-                <div class="input-icon-wrap" style="position:relative;">
-                    <i class="bi bi-person" style="position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:#666;"></i>
-                    <input type="text" class="form-control" id="full_name" name="full_name"
+                <label class="field-label" for="full_name">Full Name</label>
+                <div class="input-wrap">
+                    <i class="bi bi-person icon-left"></i>
+                    <input type="text" class="auth-input" id="full_name" name="full_name"
                            required autocomplete="name" placeholder="Enter your full name"
-                           value="{{ request.form.get('full_name', '') }}"
-                           style="padding-left:2.75rem; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.8); color:#111; border-radius:100px; height:48px;">
+                           value="{{ request.form.get('full_name', '') }}">
                 </div>
             </div>
+
+            <!-- Email -->
             <div>
-                <label class="form-label" for="email" style="color:#111; font-weight:600; margin-bottom:0.25rem;">Email Address</label>
-                <div class="input-icon-wrap" style="position:relative;">
-                    <i class="bi bi-envelope" style="position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:#666;"></i>
-                    <input type="email" class="form-control" id="email" name="email"
+                <label class="field-label" for="email">Email Address</label>
+                <div class="input-wrap">
+                    <i class="bi bi-envelope icon-left"></i>
+                    <input type="email" class="auth-input" id="email" name="email"
                            required autocomplete="email" placeholder="Enter your email address"
-                           value="{{ request.form.get('email', '') }}"
-                           style="padding-left:2.75rem; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.8); color:#111; border-radius:100px; height:48px;">
+                           value="{{ request.form.get('email', '') }}">
                 </div>
             </div>
+
+            <!-- Password -->
             <div>
-                <label class="form-label" for="password" style="color:#111; font-weight:600; margin-bottom:0.25rem;">Password</label>
-                <div class="input-icon-wrap" style="position:relative; border-radius:100px; overflow:hidden;">
-                    <i class="bi bi-lock" style="position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:#666; z-index:2; pointer-events:none;"></i>
-                    <input type="password" class="form-control" id="password" name="password"
-                           required autocomplete="new-password" placeholder="Enter a strong password (Min. 8 characters)"
-                           oninput="checkStrength(this.value)"
-                           style="padding-left:2.75rem; padding-right:3.25rem; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.8); color:#111; border-radius:100px; height:48px; position:relative; z-index:1;">
-                    <button type="button" onclick="togglePass('password','eye1')"
-                            style="position:absolute; right:0; top:0; height:48px; width:48px; background:transparent; border:none; cursor:pointer; color:#555; display:flex; align-items:center; justify-content:center; z-index:3;">
+                <label class="field-label" for="password">Password</label>
+                <div class="input-wrap">
+                    <i class="bi bi-lock icon-left"></i>
+                    <input type="password" class="auth-input has-right" id="password" name="password"
+                           required autocomplete="new-password"
+                           placeholder="Min. 6 characters"
+                           oninput="checkStrength(this.value)">
+                    <button type="button" class="toggle-eye" onclick="togglePass('password','eye1')" aria-label="Toggle password visibility">
                         <i class="bi bi-eye" id="eye1"></i>
                     </button>
                 </div>
-                <!-- Strength bar -->
-                <div style="margin-top:8px; padding:0 8px;">
-                    <div style="height:4px; background:rgba(0,0,0,0.1); border-radius:10px; overflow:hidden;">
-                        <div id="strengthBar" style="height:100%; width:0%; transition:width 0.3s, background 0.3s; border-radius:10px;"></div>
-                    </div>
-                    <div id="strengthLabel" style="font-size:0.75rem; color:#666; margin-top:4px;"></div>
+                <div class="strength-track">
+                    <div class="strength-fill" id="strengthBar"></div>
                 </div>
+                <div class="strength-label" id="strengthLabel"></div>
             </div>
+
+            <!-- Confirm Password -->
             <div>
-                <label class="form-label" for="confirm_password" style="color:#111; font-weight:600; margin-bottom:0.25rem;">Confirm Password</label>
-                <div class="input-icon-wrap" style="position:relative; border-radius:100px; overflow:hidden;">
-                    <i class="bi bi-lock-fill" style="position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:#666; z-index:2; pointer-events:none;"></i>
-                    <input type="password" class="form-control" id="confirm_password" name="confirm_password"
-                           required autocomplete="new-password" placeholder="Confirm your password"
-                           style="padding-left:2.75rem; padding-right:3.25rem; background:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.8); color:#111; border-radius:100px; height:48px; position:relative; z-index:1;">
-                    <button type="button" onclick="togglePass('confirm_password','eye2')"
-                            style="position:absolute; right:0; top:0; height:48px; width:48px; background:transparent; border:none; cursor:pointer; color:#555; display:flex; align-items:center; justify-content:center; z-index:3;">
+                <label class="field-label" for="confirm_password">Confirm Password</label>
+                <div class="input-wrap">
+                    <i class="bi bi-lock-fill icon-left"></i>
+                    <input type="password" class="auth-input has-right" id="confirm_password" name="confirm_password"
+                           required autocomplete="new-password" placeholder="Confirm your password">
+                    <button type="button" class="toggle-eye" onclick="togglePass('confirm_password','eye2')" aria-label="Toggle confirm password visibility">
                         <i class="bi bi-eye" id="eye2"></i>
                     </button>
                 </div>
             </div>
-            <div style="display:flex; align-items:flex-start; gap:0.75rem; padding:0 0.5rem;">
-                <input type="checkbox" id="terms" name="terms" class="form-check-input" required
-                       style="margin-top:4px; flex-shrink:0;">
-                <label for="terms" style="font-size:0.8rem; color:#444; cursor:pointer; line-height:1.5;">
-                    I agree to the <a href="#" style="color:#4F46E5;">Terms of Service</a> and
-                    <a href="#" style="color:#4F46E5;">Privacy Policy</a>.
+
+            <!-- Terms -->
+            <div class="terms-row">
+                <input type="checkbox" id="terms" name="terms" required>
+                <label for="terms">
+                    I agree to the <a href="#">Terms of Service</a> and
+                    <a href="#">Privacy Policy</a>.
                 </label>
             </div>
+
         </div>
 
-        <button type="submit" class="btn w-100" style="height:48px; border-radius:100px; font-weight:600; background:linear-gradient(to right, #00c6ff, #0072ff); color:white; border:none; box-shadow:0 4px 15px rgba(0, 114, 255, 0.3);" id="submitBtn">
-            Create Account <i class="bi bi-arrow-right ms-1"></i>
+        <button type="submit" class="btn-submit" id="submitBtn">
+            Create Account <i class="bi bi-arrow-right"></i>
         </button>
     </form>
 
-    <div class="divider-text" style="margin:1.5rem 0; color:#111;">Already have an account?</div>
+    <div class="divider">Already have an account?</div>
 
-    <a href="{{ url_for('auth.login') }}" class="btn w-100" style="height:48px; border-radius:100px; font-weight:600; background:transparent; border:1.5px solid #fff; color:#fff; display:flex; align-items:center; justify-content:center; gap:0.5rem; text-decoration:none;">
-        <i class="bi bi-box-arrow-in-right"></i> Sign In
-    </a>
+    <p class="card-footer-text">
+        <a href="{{ url_for('auth.login') }}">Sign in here</a>
+    </p>
+
 </div>
-{% endblock %}
 
-{% block scripts %}
 <script>
 function togglePass(id, iconId) {
     const inp = document.getElementById(id);
     const icon = document.getElementById(iconId);
-    inp.type = inp.type === 'password' ? 'text' : 'password';
-    icon.className = inp.type === 'text' ? 'bi bi-eye-slash' : 'bi bi-eye';
+    if (inp.type === 'password') {
+        inp.type = 'text';
+        icon.className = 'bi bi-eye-slash';
+    } else {
+        inp.type = 'password';
+        icon.className = 'bi bi-eye';
+    }
 }
 
 function checkStrength(val) {
     const bar = document.getElementById('strengthBar');
     const label = document.getElementById('strengthLabel');
     let score = 0;
-    if (val.length >= 8) score++;
+    if (val.length >= 6) score++;
     if (/[A-Z]/.test(val)) score++;
     if (/[0-9]/.test(val)) score++;
     if (/[^A-Za-z0-9]/.test(val)) score++;
 
     const levels = [
         { pct: '0%',   color: 'transparent', text: '' },
-        { pct: '25%',  color: '#dc3545', text: 'Weak' },
-        { pct: '50%',  color: '#ffc107', text: 'Fair' },
-        { pct: '75%',  color: '#0d6efd', text: 'Good' },
-        { pct: '100%', color: '#198754', text: 'Strong ✓' },
+        { pct: '25%',  color: '#ef4444',     text: 'Weak' },
+        { pct: '50%',  color: '#f59e0b',     text: 'Fair' },
+        { pct: '75%',  color: '#06b6d4',     text: 'Good' },
+        { pct: '100%', color: '#10b981',     text: 'Strong ✓' },
     ];
     const lvl = levels[score] || levels[0];
     bar.style.width = lvl.pct;
@@ -122,14 +434,21 @@ document.getElementById('registerForm').addEventListener('submit', function(e) {
     const p2 = document.getElementById('confirm_password').value;
     if (p1 !== p2) {
         e.preventDefault();
-        document.getElementById('confirm_password').classList.add('is-invalid');
+        const inp = document.getElementById('confirm_password');
+        inp.style.borderColor = 'rgba(239,68,68,0.7)';
+        inp.style.boxShadow = '0 0 0 3px rgba(239,68,68,0.18)';
         const err = document.createElement('div');
-        err.className = 'form-text';
-        err.style.color = '#dc3545';
+        err.style.cssText = 'font-size:0.75rem; color:#fca5a5; margin-top:5px; padding-left:0.75rem;';
         err.textContent = 'Passwords do not match.';
-        document.getElementById('confirm_password').after(err);
-        setTimeout(() => err.remove(), 3000);
+        inp.closest('.input-wrap').after(err);
+        setTimeout(() => {
+            err.remove();
+            inp.style.borderColor = '';
+            inp.style.boxShadow = '';
+        }, 3000);
     }
 });
 </script>
-{% endblock %}
+
+</body>
+</html>

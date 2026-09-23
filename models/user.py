@@ -19,7 +19,7 @@ class UserModel:
             INSERT INTO users (full_name, email, password_hash)
             VALUES (%s, %s, %s)
         '''
-        return execute_db(query, (full_name, email.strip().lower(), hashed_password))
+        return execute_db(query, (full_name, email.strip().lower(), hashed_password), get_id=True)
         
     @staticmethod
     def check_password(user, password):
