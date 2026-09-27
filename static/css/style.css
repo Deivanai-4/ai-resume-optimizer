@@ -1228,6 +1228,10 @@ p { color: var(--text-2); line-height: 1.7; }
 /* ── AI LOADING STATE ──────────────────────────────────────── */
 .ai-loading-overlay {
   position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   inset: 0;
   background: rgba(15,23,42,0.6);
   backdrop-filter: blur(4px);
@@ -1273,7 +1277,7 @@ p { color: var(--text-2); line-height: 1.7; }
   transition: all var(--transition-base);
 }
 .ai-step.active { color: var(--primary); background: var(--primary-50); }
-.ai-step.done   { color: var(--success); }
+.ai-step.done   { color: var(--text-2); }
 .ai-step-icon {
   width: 28px;
   height: 28px;
@@ -1419,11 +1423,11 @@ p { color: var(--text-2); line-height: 1.7; }
 .upload-zone-icon { font-size:2.5rem; color:var(--primary); margin-bottom:var(--space-3); display:block; }
 
 /* ── AI Loading ────────────────────────────────────────────── */
-.ai-loading-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.7); backdrop-filter:blur(4px); z-index:calc(var(--z-modal)+10); display:flex; align-items:center; justify-content:center; }
+.ai-loading-overlay { position:fixed; top:0; left:0; right:0; bottom:0; inset:0; background:rgba(15,23,42,0.7); backdrop-filter:blur(4px); z-index:calc(var(--z-modal)+10); display:flex; align-items:center; justify-content:center; }
 .ai-loading-card { background:var(--surface); border-radius:var(--radius-xl); padding:var(--space-8) var(--space-10); max-width:420px; width:90vw; box-shadow:var(--shadow-2xl); text-align:center; }
 .ai-step { display:flex; align-items:center; gap:var(--space-3); font-size:var(--text-sm); color:var(--text-3); padding:var(--space-2) var(--space-3); border-radius:var(--radius-sm); transition:all var(--transition-base); }
 .ai-step.active { color:var(--primary); background:var(--primary-50); font-weight:600; }
-.ai-step.done { color:var(--success); }
+.ai-step.done { color:var(--text-2); }
 .ai-step-icon { width:28px; height:28px; border-radius:50%; background:var(--surface-3); display:flex; align-items:center; justify-content:center; font-size:var(--text-xs); font-weight:700; flex-shrink:0; transition:all var(--transition-base); }
 .ai-step.active .ai-step-icon { background:var(--primary); color:white; }
 .ai-step.done .ai-step-icon { background:var(--success); color:white; }

@@ -13,6 +13,7 @@ const SidebarManager = (() => {
     const sidebar     = document.getElementById('sidebar');
     const mainContent = document.getElementById('main-content');
     const toggleBtn   = document.getElementById('sidebarToggle');
+    const mobileBtn   = document.getElementById('mobileSidebarBtn');
     const overlay     = document.getElementById('sidebarOverlay');
 
     function isDesktop() { return window.innerWidth >= 769; }
@@ -25,6 +26,7 @@ const SidebarManager = (() => {
         } else {
             sidebar?.classList.remove('mobile-open');
             overlay?.classList.remove('active');
+            document.body.style.overflow = '';
         }
     }
 
@@ -36,6 +38,7 @@ const SidebarManager = (() => {
         } else {
             sidebar?.classList.add('mobile-open');
             overlay?.classList.add('active');
+            document.body.style.overflow = 'hidden'; // prevent scroll behind overlay
         }
     }
 
@@ -58,14 +61,30 @@ const SidebarManager = (() => {
             mainContent?.classList.add('sidebar-collapsed-content');
         }
 
+        // Sidebar header toggle (desktop collapse / mobile open)
         toggleBtn?.addEventListener('click', toggle);
+
+        // Topbar mobile hamburger button
+        mobileBtn?.addEventListener('click', () => {
+            if (!isDesktop()) expand();
+        });
+
+        // Overlay closes sidebar
         overlay?.addEventListener('click', collapse);
 
-        // Responsive: close mobile sidebar on resize
+        // Auto-close sidebar on mobile when a nav link is tapped
+        sidebar?.querySelectorAll('.sidebar-nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                if (!isDesktop()) collapse();
+            });
+        });
+
+        // Responsive: close mobile sidebar on resize to desktop
         window.addEventListener('resize', () => {
             if (isDesktop()) {
                 sidebar.classList.remove('mobile-open');
                 overlay?.classList.remove('active');
+                document.body.style.overflow = '';
             }
         });
     }

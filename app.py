@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 from datetime import datetime
 from flask import Flask, render_template, session, redirect, url_for
 from config import config
@@ -10,6 +11,13 @@ bcrypt = Bcrypt()
 
 
 def create_app(config_name="default"):
+    # Configure global logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
     app = Flask(__name__)
     app.config.from_object(config[config_name])
 

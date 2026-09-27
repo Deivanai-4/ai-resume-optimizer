@@ -528,8 +528,11 @@ def _validate_and_patch(content, candidate_data, company_name, job_role):
     real_companies = {e["company"].lower() for e in candidate_data.get("experience", [])}
     real_companies.add("fresher")  # allow "Fresher" token
     validated_exp = []
-    for exp in content.get("experience", []):
-        co = (exp.get("company") or "").lower().strip()
+    raw_exp = content.get("experience")
+    if not isinstance(raw_exp, list):
+        raw_exp = []
+    for exp in raw_exp:
+        co = (exp.get("company") or "").lower().strip() if isinstance(exp, dict) else ""
         # If source resume was uploaded, trust AI extraction (it read the actual file)
         # Only strip if NO source resume and company is completely unknown
         if has_source_resume or not co or co in real_companies or not real_companies - {"fresher"}:
@@ -917,7 +920,203 @@ def render_pdf(content_json, template_name="classic", output_path=None):
         return output_path
 
     except Exception as exc:
-        logger.error(f"PDF render error: {exc}")
+        logger.error(f"PDF render error: {exc}", exc_info=True)
+        return None
+
+
+def render_pdf_bytes(content_json, template_name="classic"):
+    """
+    Render a resume to PDF fully in memory (no disk I/O).
+    Returns bytes on success, None on failure.
+    Safe for ephemeral deployment filesystems.
+    """
+    import io as _io
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
+        from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                        HRFlowable)
+
+        buf = _io.BytesIO()
+
+        PAGE_W, PAGE_H = A4
+        doc = SimpleDocTemplate(
+            buf, pagesize=A4,
+            rightMargin=0.65*inch, leftMargin=0.65*inch,
+            topMargin=0.65*inch, bottomMargin=0.65*inch
+        )
+
+        styles = getSampleStyleSheet()
+        PALETTE = {
+            "classic":       {"primary": "#1E3A5F", "accent": "#2563EB", "line": "#334155"},
+            "modern":        {"primary": "#4F46E5", "accent": "#7C3AED", "line": "#6366F1"},
+            "minimal":       {"primary": "#111827", "accent": "#374151", "line": "#6B7280"},
+            "clean_classic": {"primary": "#000000", "accent": "#000000", "line": "#000000"},
+            "prestige_red":  {"primary": "#8B0000", "accent": "#8B0000", "line": "#8B0000"},
+            "classic_ats":   {"primary": "#1E3A5F", "accent": "#2563EB", "line": "#334155"},
+            "modern_pro":    {"primary": "#4F46E5", "accent": "#7C3AED", "line": "#6366F1"},
+            "minimal_ats":   {"primary": "#111827", "accent": "#374151", "line": "#6B7280"},
+            "profile_photo": {"primary": "#1E3A5F", "accent": "#2563EB", "line": "#334155"},
+            "tech_dev":      {"primary": "#0F172A", "accent": "#06B6D4", "line": "#334155"},
+        }.get(template_name, {"primary": "#1E3A5F", "accent": "#2563EB", "line": "#334155"})
+
+        def hex_color(h):
+            h = h.lstrip("#")
+            return colors.Color(*[int(h[i:i+2], 16)/255 for i in (0, 2, 4)])
+
+        c_primary = hex_color(PALETTE["primary"])
+        c_accent  = hex_color(PALETTE["accent"])
+        c_line    = hex_color(PALETTE["line"])
+        c_text    = hex_color("#1E293B")
+        c_muted   = hex_color("#64748B")
+
+        header_align = TA_LEFT if template_name == "prestige_red" else TA_CENTER
+
+        name_st = ParagraphStyle("Name", parent=styles["Normal"], fontSize=20,
+                                 fontName="Helvetica-Bold", textColor=c_primary,
+                                 alignment=header_align, spaceAfter=2)
+        contact_st = ParagraphStyle("Contact", parent=styles["Normal"], fontSize=9,
+                                    textColor=c_muted, alignment=header_align, spaceAfter=8)
+        section_st = ParagraphStyle("Section", parent=styles["Normal"], fontSize=11,
+                                    fontName="Helvetica-Bold", textColor=c_primary,
+                                    spaceBefore=10, spaceAfter=3)
+        body_st  = ParagraphStyle("Body", parent=styles["Normal"], fontSize=9.5,
+                                  textColor=c_text, leading=14, spaceAfter=2,
+                                  alignment=TA_JUSTIFY)
+        bullet_st = ParagraphStyle("Bullet", parent=styles["Normal"], fontSize=9.5,
+                                   textColor=c_text, leading=13, leftIndent=12, spaceAfter=1)
+        job_title_st = ParagraphStyle("JobTitle", parent=styles["Normal"], fontSize=10,
+                                      fontName="Helvetica-Bold", textColor=c_text, spaceAfter=1)
+        meta_st  = ParagraphStyle("Meta", parent=styles["Normal"], fontSize=9,
+                                  textColor=c_muted, spaceAfter=2)
+
+        cand  = content_json.get("candidate") or {}
+        story = []
+
+        # Header
+        story.append(Paragraph(cand.get("name") or "Candidate", name_st))
+        if template_name in ("prestige_red",):
+            role_st = ParagraphStyle("Role", parent=styles["Normal"], fontSize=11,
+                                     fontName="Helvetica-Oblique", textColor=c_muted,
+                                     alignment=header_align, spaceAfter=4)
+            story.append(Paragraph(
+                content_json.get("target", {}).get("job_role", "Professional"), role_st))
+
+        contact_parts = [p for p in [
+            cand.get("email"), cand.get("phone"), cand.get("location"),
+            cand.get("linkedin"), cand.get("github"), cand.get("portfolio")
+        ] if p]
+        if contact_parts:
+            story.append(Paragraph("  |  ".join(contact_parts), contact_st))
+        story.append(HRFlowable(width="100%", thickness=1.5, color=c_accent, spaceAfter=6))
+
+        def section(title):
+            story.append(Paragraph(title.upper(), section_st))
+            story.append(HRFlowable(width="100%", thickness=0.5, color=c_line, spaceAfter=4))
+
+        summary = content_json.get("professional_summary", "")
+        if summary:
+            section("Professional Summary")
+            story.append(Paragraph(str(summary), body_st))
+
+        sk = content_json.get("skills") or {}
+        labels_map = {
+            "programming": "Programming", "frameworks": "Frameworks",
+            "databases": "Databases", "analytics": "Data & Analytics",
+            "tools": "Tools", "other": "Other",
+        }
+        all_sk_lines = []
+        for key, label in labels_map.items():
+            vals = [s for s in (sk.get(key) or []) if s]
+            if vals:
+                all_sk_lines.append(f"<b>{label}:</b> {', '.join(vals)}")
+        if all_sk_lines:
+            section("Skills")
+            for line in all_sk_lines:
+                story.append(Paragraph(line, body_st))
+
+        education = content_json.get("education") or []
+        if education:
+            section("Education")
+            for edu in education:
+                deg   = edu.get("degree", "")
+                inst  = edu.get("institution", "")
+                yr    = edu.get("year", "")
+                cgpa  = f" | CGPA: {edu['cgpa']}" if edu.get("cgpa") else ""
+                field = f", {edu['field']}" if edu.get("field") else ""
+                story.append(Paragraph(f"<b>{deg}{field}</b>", job_title_st))
+                story.append(Paragraph(f"{inst}  {yr}{cgpa}", meta_st))
+
+        experience = content_json.get("experience") or []
+        if experience:
+            section("Experience")
+            for exp in experience:
+                title   = exp.get("title", "")
+                company = exp.get("company", "")
+                dur     = exp.get("duration", "")
+                if title or company:
+                    story.append(Paragraph(f"<b>{title}</b> — {company}", job_title_st))
+                    if dur:
+                        story.append(Paragraph(dur, meta_st))
+                for resp in (exp.get("responsibilities") or []):
+                    if resp:
+                        story.append(Paragraph(f"• {resp}", bullet_st))
+                story.append(Spacer(1, 4))
+
+        projects = content_json.get("projects") or []
+        if projects:
+            section("Projects")
+            for proj in projects:
+                name    = proj.get("name", "")
+                tech    = proj.get("technologies", "")
+                desc    = proj.get("description", "")
+                bullets = proj.get("bullets") or []
+                gh      = proj.get("github", "")
+                header  = f"<b>{name}</b>"
+                if tech:
+                    header += f" <font color='#64748B' size='8'>| {tech}</font>"
+                story.append(Paragraph(header, job_title_st))
+                if desc and not bullets:
+                    story.append(Paragraph(desc, bullet_st))
+                for b in bullets:
+                    if b:
+                        story.append(Paragraph(f"• {b}", bullet_st))
+                if gh:
+                    story.append(Paragraph(f"<font color='#2563EB'>{gh}</font>", meta_st))
+                story.append(Spacer(1, 4))
+
+        certs = content_json.get("certifications") or []
+        if certs:
+            section("Certifications")
+            for cert in certs:
+                if isinstance(cert, dict):
+                    story.append(Paragraph(
+                        f"• <b>{cert.get('name','')}</b> — {cert.get('org','')} ({cert.get('year','')})",
+                        bullet_st))
+                elif cert:
+                    story.append(Paragraph(f"• {cert}", bullet_st))
+
+        achievements = content_json.get("achievements") or []
+        if achievements:
+            section("Achievements")
+            for ach in achievements:
+                if isinstance(ach, dict):
+                    story.append(Paragraph(
+                        f"• <b>{ach.get('title','')}</b>: {ach.get('description','')}",
+                        bullet_st))
+                elif ach:
+                    story.append(Paragraph(f"• {ach}", bullet_st))
+
+        doc.build(story)
+        pdf_bytes = buf.getvalue()
+        logger.info(f"[PDF] render_pdf_bytes success — {len(pdf_bytes)} bytes")
+        return pdf_bytes
+
+    except Exception as exc:
+        logger.error(f"[PDF] render_pdf_bytes error: {exc}", exc_info=True)
         return None
 
 
@@ -1126,7 +1325,207 @@ def render_docx(content_json, template_name="classic", output_path=None):
         return output_path
 
     except Exception as exc:
-        logger.error(f"DOCX render error: {exc}")
+        logger.error(f"DOCX render error: {exc}", exc_info=True)
+        return None
+
+
+def render_docx_bytes(content_json, template_name="classic"):
+    """
+    Render a resume to DOCX fully in memory (no disk I/O).
+    Returns bytes on success, None on failure.
+    Safe for ephemeral deployment filesystems.
+    """
+    import io as _io
+    try:
+        from docx import Document
+        from docx.shared import Pt, RGBColor, Inches, Cm
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.oxml.ns import qn
+        from docx.oxml import OxmlElement
+
+        PALETTES = {
+            "classic":       (0x1E, 0x3A, 0x5F),
+            "modern":        (0x4F, 0x46, 0xE5),
+            "minimal":       (0x11, 0x18, 0x27),
+            "clean_classic": (0x00, 0x00, 0x00),
+            "prestige_red":  (0x8B, 0x00, 0x00),
+            "classic_ats":   (0x1E, 0x3A, 0x5F),
+            "modern_pro":    (0x4F, 0x46, 0xE5),
+            "minimal_ats":   (0x11, 0x18, 0x27),
+            "profile_photo": (0x1E, 0x3A, 0x5F),
+            "tech_dev":      (0x0F, 0x17, 0x2A),
+        }
+        pr, pg, pb = PALETTES.get(template_name, PALETTES["classic"])
+        header_align = WD_ALIGN_PARAGRAPH.LEFT if template_name == "prestige_red" else WD_ALIGN_PARAGRAPH.CENTER
+
+        doc = Document()
+        for sec in doc.sections:
+            sec.top_margin = Cm(1.5)
+            sec.bottom_margin = Cm(1.5)
+            sec.left_margin = Cm(2)
+            sec.right_margin = Cm(2)
+
+        def add_hr(p):
+            p_elem = p._element
+            pPr = p_elem.get_or_add_pPr()
+            pBdr = OxmlElement('w:pBdr')
+            bottom = OxmlElement('w:bottom')
+            bottom.set(qn('w:val'), 'single')
+            bottom.set(qn('w:sz'), '6')
+            bottom.set(qn('w:space'), '1')
+            bottom.set(qn('w:color'), f'{pr:02X}{pg:02X}{pb:02X}')
+            pBdr.append(bottom)
+            pPr.append(pBdr)
+
+        def set_run_color(run, r, g, b):
+            run.font.color.rgb = RGBColor(r, g, b)
+
+        cand = content_json.get("candidate") or {}
+
+        name_p = doc.add_paragraph()
+        name_p.alignment = header_align
+        name_r = name_p.add_run(cand.get("name", "") or "Candidate")
+        name_r.bold = True
+        name_r.font.size = Pt(20)
+        set_run_color(name_r, pr, pg, pb)
+
+        if template_name == "prestige_red":
+            role_p = doc.add_paragraph()
+            role_p.alignment = header_align
+            role_r = role_p.add_run(content_json.get("target", {}).get("job_role", "Professional"))
+            role_r.italic = True
+            role_r.font.size = Pt(11)
+            set_run_color(role_r, 0x64, 0x74, 0x8B)
+
+        contact_parts = [p for p in [
+            cand.get("email"), cand.get("phone"), cand.get("location"),
+            cand.get("linkedin"), cand.get("github")
+        ] if p]
+        if contact_parts:
+            contact_p = doc.add_paragraph("  |  ".join(contact_parts))
+            contact_p.alignment = header_align
+            for run in contact_p.runs:
+                run.font.size = Pt(9)
+                set_run_color(run, 0x64, 0x74, 0x8B)
+            add_hr(contact_p)
+
+        def add_section(title):
+            p = doc.add_paragraph()
+            run = p.add_run(title.upper())
+            run.bold = True
+            run.font.size = Pt(10.5)
+            set_run_color(run, pr, pg, pb)
+            add_hr(p)
+
+        def add_body(text, bold=False, indent=False):
+            p = doc.add_paragraph()
+            if indent:
+                p.paragraph_format.left_indent = Inches(0.2)
+            run = p.add_run(str(text))
+            run.bold = bold
+            run.font.size = Pt(9.5)
+
+        summary = content_json.get("professional_summary", "")
+        if summary:
+            add_section("Professional Summary")
+            add_body(summary)
+
+        sk = content_json.get("skills") or {}
+        labels_map = {
+            "programming": "Programming", "frameworks": "Frameworks",
+            "databases": "Databases", "analytics": "Data & Analytics",
+            "tools": "Tools", "other": "Other",
+        }
+        skill_lines = []
+        for key, label in labels_map.items():
+            vals = [s for s in (sk.get(key) or []) if s]
+            if vals:
+                skill_lines.append((label, ", ".join(vals)))
+        if skill_lines:
+            add_section("Skills")
+            for label, val in skill_lines:
+                p = doc.add_paragraph()
+                r1 = p.add_run(f"{label}: ")
+                r1.bold = True; r1.font.size = Pt(9.5)
+                r2 = p.add_run(val)
+                r2.font.size = Pt(9.5)
+
+        education = content_json.get("education") or []
+        if education:
+            add_section("Education")
+            for edu in education:
+                deg   = edu.get("degree", "")
+                field = edu.get("field", "")
+                inst  = edu.get("institution", "")
+                yr    = edu.get("year", "")
+                cgpa  = f" | CGPA: {edu['cgpa']}" if edu.get("cgpa") else ""
+                p = doc.add_paragraph()
+                r = p.add_run(f"{deg}{', '+field if field else ''}")
+                r.bold = True; r.font.size = Pt(10)
+                add_body(f"{inst}  {yr}{cgpa}")
+
+        experience = content_json.get("experience") or []
+        if experience:
+            add_section("Experience")
+            for exp in experience:
+                title   = exp.get("title", "")
+                company = exp.get("company", "")
+                dur     = exp.get("duration", "")
+                if title or company:
+                    p = doc.add_paragraph()
+                    r = p.add_run(f"{title} — {company}")
+                    r.bold = True; r.font.size = Pt(10)
+                if dur:
+                    add_body(dur)
+                for resp in (exp.get("responsibilities") or []):
+                    if resp:
+                        add_body(f"• {resp}", indent=True)
+
+        projects = content_json.get("projects") or []
+        if projects:
+            add_section("Projects")
+            for proj in projects:
+                name    = proj.get("name", "")
+                tech    = proj.get("technologies", "")
+                bullets = proj.get("bullets") or []
+                desc    = proj.get("description", "")
+                p = doc.add_paragraph()
+                r = p.add_run(name)
+                r.bold = True; r.font.size = Pt(10)
+                if tech:
+                    add_body(f"Technologies: {tech}")
+                if desc and not bullets:
+                    add_body(f"• {desc}", indent=True)
+                for b in bullets:
+                    if b:
+                        add_body(f"• {b}", indent=True)
+
+        certs = content_json.get("certifications") or []
+        if certs:
+            add_section("Certifications")
+            for cert in certs:
+                if isinstance(cert, dict):
+                    add_body(f"• {cert.get('name','')} — {cert.get('org','')} ({cert.get('year','')})", indent=True)
+                elif cert:
+                    add_body(f"• {cert}", indent=True)
+
+        achievements = content_json.get("achievements") or []
+        if achievements:
+            add_section("Achievements")
+            for ach in achievements:
+                if isinstance(ach, dict):
+                    add_body(f"• {ach.get('title','')}: {ach.get('description','')}", indent=True)
+                elif ach:
+                    add_body(f"• {ach}", indent=True)
+
+        buf = _io.BytesIO()
+        doc.save(buf)
+        docx_bytes = buf.getvalue()
+        logger.info(f"[DOCX] render_docx_bytes success — {len(docx_bytes)} bytes")
+        return docx_bytes
+
+    except Exception as exc:
+        logger.error(f"[DOCX] render_docx_bytes error: {exc}", exc_info=True)
         return None
 
 

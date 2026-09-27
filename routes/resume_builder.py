@@ -107,8 +107,10 @@ def generate():
     source_resume_text = None
     if source_resume_id:
         resume = ResumeModel.get_by_id(source_resume_id, user_id)
-        if resume:
-            source_resume_text = resume.get('extracted_text', '') or ''
+        if not resume:
+            flash('Invalid source resume or permission denied.', 'danger')
+            return redirect(url_for('resume_builder.create'))
+        source_resume_text = resume.get('extracted_text', '') or ''
 
     company_name_display = company_name_man
     if company_id and not company_name_display:
@@ -296,27 +298,54 @@ def change_template(gen_id):
 @resume_builder_bp.route('/resume/download/pdf/<int:gen_id>')
 @login_required
 def download_pdf(gen_id):
+    import io
+    from services.resume_generation_service import render_pdf_bytes
+
     user_id = session['user_id']
-    gen     = GeneratedResumeModel.get_by_id(gen_id, user_id)
+    logger.info(f"[PDF] Download requested — User ID: {user_id}, Resume ID: {gen_id}")
+
+    gen = GeneratedResumeModel.get_by_id(gen_id, user_id)
     if not gen:
-        flash('Resume not found.', 'danger')
+        logger.warning(f"[PDF] Resume not found — Resume ID: {gen_id}, User ID: {user_id}")
+        flash('Resume not found or you do not have permission to access it.', 'danger')
         return redirect(url_for('resume_builder.create'))
 
-    import uuid
-    from services.resume_generation_service import render_pdf
+    content_json = gen.get('content_json')
+    template     = gen.get('template', 'classic')
+    logger.info(f"[PDF] Resume found — Template: {template}, Label: {gen.get('label')}")
+    logger.info(f"[PDF] Content keys: {list(content_json.keys()) if content_json else 'EMPTY'}")
 
-    out_dir  = _gen_dir(user_id)
-    filename = f"resume_{gen_id}_{uuid.uuid4().hex[:8]}.pdf"
-    out_path = os.path.join(out_dir, filename)
-
-    result = render_pdf(gen['content_json'], gen.get('template', 'classic'), out_path)
-    if not result or not os.path.exists(out_path):
-        flash('PDF generation failed. Please try again.', 'danger')
+    if not content_json:
+        logger.error(f"[PDF] content_json is empty — Resume ID: {gen_id}")
+        flash('This resume has no content to generate a PDF from. Please regenerate it.', 'danger')
         return redirect(url_for('resume_builder.preview', gen_id=gen_id))
+
+    logger.info(f"[PDF] Starting PDF generation — User ID: {user_id}, Resume ID: {gen_id}")
+    try:
+        pdf_bytes = render_pdf_bytes(content_json, template)
+    except Exception as exc:
+        logger.error(f"[PDF] PDF generation raised exception — User ID: {user_id}, Error: {exc}", exc_info=True)
+        flash('PDF generation failed due to an internal error. Please try again or contact support.', 'danger')
+        return redirect(url_for('resume_builder.preview', gen_id=gen_id))
+
+    if not pdf_bytes:
+        logger.error(f"[PDF] render_pdf_bytes returned None/empty — User ID: {user_id}, Resume ID: {gen_id}")
+        flash('PDF generation failed. Please try regenerating the resume.', 'danger')
+        return redirect(url_for('resume_builder.preview', gen_id=gen_id))
+
+    logger.info(f"[PDF] PDF generation completed — {len(pdf_bytes)} bytes, User ID: {user_id}")
 
     dl_name = f"{gen.get('label','resume').replace(' — ', '_').replace(' ', '_')}.pdf"
     log_activity(user_id, 'resume_download_pdf', f'Downloaded PDF: {dl_name}')
-    return send_file(out_path, download_name=dl_name, as_attachment=True)
+
+    buf = io.BytesIO(pdf_bytes)
+    buf.seek(0)
+    return send_file(
+        buf,
+        download_name=dl_name,
+        as_attachment=True,
+        mimetype='application/pdf'
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -326,27 +355,51 @@ def download_pdf(gen_id):
 @resume_builder_bp.route('/resume/download/docx/<int:gen_id>')
 @login_required
 def download_docx(gen_id):
+    import io
+    from services.resume_generation_service import render_docx_bytes
+
     user_id = session['user_id']
-    gen     = GeneratedResumeModel.get_by_id(gen_id, user_id)
+    logger.info(f"[DOCX] Download requested — User ID: {user_id}, Resume ID: {gen_id}")
+
+    gen = GeneratedResumeModel.get_by_id(gen_id, user_id)
     if not gen:
-        flash('Resume not found.', 'danger')
+        logger.warning(f"[DOCX] Resume not found — Resume ID: {gen_id}, User ID: {user_id}")
+        flash('Resume not found or you do not have permission to access it.', 'danger')
         return redirect(url_for('resume_builder.create'))
 
-    import uuid
-    from services.resume_generation_service import render_docx
+    content_json = gen.get('content_json')
+    template     = gen.get('template', 'classic')
+    logger.info(f"[DOCX] Resume found — Template: {template}")
 
-    out_dir  = _gen_dir(user_id)
-    filename = f"resume_{gen_id}_{uuid.uuid4().hex[:8]}.docx"
-    out_path = os.path.join(out_dir, filename)
-
-    result = render_docx(gen['content_json'], gen.get('template', 'classic'), out_path)
-    if not result or not os.path.exists(out_path):
-        flash('DOCX generation failed. Please try again.', 'danger')
+    if not content_json:
+        flash('This resume has no content to generate a DOCX from. Please regenerate it.', 'danger')
         return redirect(url_for('resume_builder.preview', gen_id=gen_id))
+
+    logger.info(f"[DOCX] Starting generation — User ID: {user_id}, Resume ID: {gen_id}")
+    try:
+        docx_bytes = render_docx_bytes(content_json, template)
+    except Exception as exc:
+        logger.error(f"[DOCX] Generation exception — User ID: {user_id}, Error: {exc}", exc_info=True)
+        flash('DOCX generation failed due to an internal error. Please try again.', 'danger')
+        return redirect(url_for('resume_builder.preview', gen_id=gen_id))
+
+    if not docx_bytes:
+        flash('DOCX generation failed. Please try regenerating the resume.', 'danger')
+        return redirect(url_for('resume_builder.preview', gen_id=gen_id))
+
+    logger.info(f"[DOCX] Generation completed — {len(docx_bytes)} bytes, User ID: {user_id}")
 
     dl_name = f"{gen.get('label','resume').replace(' — ', '_').replace(' ', '_')}.docx"
     log_activity(user_id, 'resume_download_docx', f'Downloaded DOCX: {dl_name}')
-    return send_file(out_path, download_name=dl_name, as_attachment=True)
+
+    buf = io.BytesIO(docx_bytes)
+    buf.seek(0)
+    return send_file(
+        buf,
+        download_name=dl_name,
+        as_attachment=True,
+        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    )
 
 
 # ---------------------------------------------------------------------------

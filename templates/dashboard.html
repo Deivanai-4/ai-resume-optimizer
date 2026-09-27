@@ -8,7 +8,7 @@
 
 <!-- ── WELCOME HEADER ──────────────────────────────────────── -->
 <div class="fade-in-up" style="margin-bottom: var(--space-6);">
-    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-4); flex-wrap:wrap;">
+    <div class="dashboard-welcome-header">
         <div>
             <h1 style="font-size:var(--text-2xl); font-weight:800; color:var(--text-1); margin-bottom:var(--space-1);">
                 Welcome back, {{ (current_user_name or 'there').split()[0] }}! 👋
@@ -17,7 +17,7 @@
                 Your personalized career readiness overview &mdash; {{ now.strftime('%A, %d %B %Y') if now is defined else 'Today' }}
             </p>
         </div>
-        <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+        <div class="dashboard-welcome-actions">
             <a href="{{ url_for('resume_builder.create') }}" class="btn btn-gradient">
                 <i class="bi bi-stars"></i> Create AI Resume
             </a>
@@ -42,7 +42,7 @@
 {% endif %}
 
 <!-- ── STAT CARDS ──────────────────────────────────────────── -->
-<div class="stat-row fade-in-up-delay-1" style="margin-bottom:var(--space-6); display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-4);">
+<div class="stat-row stat-grid fade-in-up-delay-1" style="margin-bottom:var(--space-6);">
 
     <!-- Profile Completion -->
     <a href="{{ url_for('profile.index') }}" class="stat-card" style="text-decoration:none; cursor:pointer; transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='var(--shadow-lg)'" onmouseout="this.style.transform='';this.style.boxShadow=''">

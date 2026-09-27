@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     {% block head %}{% endblock %}
@@ -163,6 +164,10 @@
         <!-- Top Navbar -->
         <header class="top-navbar" role="banner">
             <div class="topbar-left">
+                <!-- Mobile hamburger: opens sidebar overlay -->
+                <button class="mobile-menu-btn" id="mobileSidebarBtn" aria-label="Open navigation menu">
+                    <i class="bi bi-list"></i>
+                </button>
                 <h1 class="topbar-page-title">{% block page_title %}Dashboard{% endblock %}</h1>
             </div>
 
