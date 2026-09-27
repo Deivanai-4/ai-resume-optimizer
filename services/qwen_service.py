@@ -150,8 +150,7 @@ def call_qwen(
         - Token is never written to logs.
     """
     token, model, provider = _get_config()
-    with open("C:/Users/HP/Documents/2027-project/mini project-2/AI Career Intelligence Platform/qwen_debug.log", "a") as debug_f:
-        debug_f.write(f"[DEBUG] _get_config() returned token={bool(token)} model={model} provider={provider}\n")
+    logger.debug(f"QWEN: _get_config() returned token={bool(token)} model={model} provider={provider}")
 
     if not token:
         logger.warning(
@@ -191,8 +190,7 @@ def call_qwen(
         except Exception as exc:
             msg, should_retry = _classify_error(exc)
             logger.error(f"QWEN attempt {attempt}/{retries}: {msg}")
-            with open("C:/Users/HP/Documents/2027-project/mini project-2/AI Career Intelligence Platform/qwen_debug.log", "a") as debug_f:
-                debug_f.write(f"[DEBUG] Exception: {type(exc).__name__} - {str(exc)}\n")
+            logger.debug(f"QWEN Exception: {type(exc).__name__} - {str(exc)}")
             last_error = msg
 
             if not should_retry:
@@ -326,12 +324,10 @@ Raw Resume Text:
 """
     raw_response = call_qwen(prompt, max_tokens=2500, temperature=0.1)
     if not raw_response:
-        with open("qwen_debug.log", "a") as f:
-            f.write("call_qwen returned None\n")
+        logger.error("QWEN: call_qwen returned None during profile extraction")
         return None
         
     parsed = parse_qwen_json(raw_response)
     if not parsed:
-        with open("qwen_debug.log", "a") as f:
-            f.write(f"Failed to parse JSON. Raw response was:\n{raw_response}\n\n")
+        logger.error(f"QWEN: Failed to parse JSON during profile extraction. Raw response: {raw_response}")
     return parsed
