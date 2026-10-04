@@ -60,6 +60,10 @@ def update_preferences():
         (theme, email_notif, placement_alerts, weekly_report, user_id)
     )
     log_activity(user_id, 'settings_update', 'Updated preferences')
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'status': 'success'})
+        
     flash('Preferences saved!', 'success')
     return redirect(url_for('settings.index'))
 

@@ -31,7 +31,7 @@
                     <select class="form-select form-select-lg" name="resume_id" required style="border-radius:12px; border:2px solid var(--border); box-shadow:0 2px 5px rgba(0,0,0,0.02);">
                         <option value="">— Choose a resume —</option>
                         {% for r in resumes %}
-                        <option value="{{ r.id }}">{{ r.original_name }}</option>
+                        <option value="{{ r.id }}" {% if preselect_resume == r.id %}selected{% endif %}>{{ r.original_name }}</option>
                         {% endfor %}
                     </select>
                     {% if not resumes %}
@@ -95,11 +95,12 @@
                     Optimization Successful <i class="bi bi-patch-check-fill text-success" style="font-size: 1.5rem;"></i>
                 </div>
                 <div style="color:var(--text-2); font-size:var(--text-md); margin-bottom:var(--space-3);">Your resume has been successfully tailored and rewritten for maximum impact.</div>
-                <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+                <div style="display:flex; gap:var(--space-3); flex-wrap:wrap; align-items:center;">
                     <span class="badge" style="background-color:var(--success-100); color:var(--success-700); padding:0.6em 1.2em; font-size:var(--text-sm); border-radius:30px;"><i class="bi bi-graph-up-arrow me-1"></i> +{{ optimized.improvement_score }}% match improved</span>
                     {% if optimized.changes_list %}
                     <span class="badge" style="background-color:var(--primary-50); color:var(--primary-700); padding:0.6em 1.2em; font-size:var(--text-sm); border-radius:30px;"><i class="bi bi-list-stars me-1"></i> {{ optimized.changes_list|length }} strategic changes</span>
                     {% endif %}
+                    <a href="{{ url_for('analysis.index', resume_id=optimized.resume_id) }}" class="btn btn-sm btn-outline-primary" style="border-radius:30px; font-weight:700; margin-left:auto;"><i class="bi bi-graph-up-arrow me-1"></i> Run AI Analysis</a>
                 </div>
             </div>
         </div>

@@ -2,6 +2,17 @@
 {% block title %}Settings — AI Career Intelligence Platform{% endblock %}
 {% block page_title %}Settings{% endblock %}
 
+{% block head %}
+<style>
+    .settings-toggle-checkbox:checked ~ .settings-toggle-slider {
+        background: var(--primary) !important;
+    }
+    .settings-toggle-checkbox:checked ~ .settings-toggle-slider .settings-toggle-knob {
+        transform: translateX(20px) !important;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="stagger-children">
 
@@ -107,7 +118,7 @@
                     <span class="card-header-title"><i class="bi bi-palette-fill text-primary"></i> Appearance</span>
                 </div>
                 <div class="card-body">
-                    <div style="display:flex; gap:var(--space-3);">
+                    <div style="display:flex; gap:var(--space-3);" class="settings-theme-row">
                         {% for theme_id, theme_name, icon in [('light','Light','bi-sun-fill'),('dark','Dark','bi-moon-stars-fill'),('system','System','bi-display')] %}
                         <label style="flex:1; border:2px solid {{ 'var(--primary)' if (settings and settings.theme == theme_id) or (not settings and theme_id == 'light') else 'var(--border)' }}; border-radius:var(--radius-md); padding:var(--space-4); text-align:center; cursor:pointer; transition:border-color var(--transition-fast);"
                                onclick="highlightTheme('{{ theme_id }}', this)">
@@ -146,13 +157,13 @@
                             </div>
                         </div>
                         <!-- Toggle Switch -->
-                        <label style="position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; cursor:pointer;">
-                            <input type="checkbox" name="{{ field }}" id="{{ field }}"
+                        <label class="settings-toggle-label" style="position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; cursor:pointer;">
+                            <input type="checkbox" name="{{ field }}" id="{{ field }}" class="settings-toggle-checkbox"
                                    style="opacity:0; width:0; height:0; position:absolute;"
                                    {{ 'checked' if checked }}>
-                            <span onclick="this.previousElementSibling.checked=!this.previousElementSibling.checked; this.style.background=this.previousElementSibling.checked?'var(--primary)':'var(--surface-3)';"
-                                  style="position:absolute; inset:0; border-radius:100px; background:{{ 'var(--primary)' if checked else 'var(--surface-3)' }}; transition:background 0.2s; cursor:pointer;">
-                                <span style="position:absolute; height:16px; width:16px; left:4px; bottom:4px; background:white; border-radius:50%; transition:transform 0.2s; transform:{{ 'translateX(20px)' if checked else 'none' }};" id="knob-{{ field }}"></span>
+                            <span class="settings-toggle-slider"
+                                  style="position:absolute; inset:0; border-radius:100px; background:var(--surface-3); transition:background 0.2s;">
+                                <span class="settings-toggle-knob" style="position:absolute; height:16px; width:16px; left:4px; bottom:4px; background:white; border-radius:50%; transition:transform 0.2s;"></span>
                             </span>
                         </label>
                     </div>
@@ -231,6 +242,29 @@ function highlightTheme(id, label) {
         if (lbl) lbl.style.borderColor = 'var(--border)';
     });
     label.style.borderColor = 'var(--primary)';
+    
+    // Live preview
+    if (id === 'system') {
+        const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    } else {
+        document.documentElement.setAttribute('data-theme', id);
+    }
+    
+    // Auto-save via AJAX
+    const form = label.closest('form');
+    if (form) {
+        // slight delay to let radio state update if triggered from label click
+        setTimeout(() => {
+            fetch(form.action, {
+                method: form.method,
+                body: new FormData(form),
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            }).then(() => {
+                if (window.Toast) Toast.success('Theme updated');
+            }).catch(console.error);
+        }, 50);
+    }
 }
 </script>
 {% endblock %}

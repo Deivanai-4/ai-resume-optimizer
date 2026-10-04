@@ -228,6 +228,44 @@ def extract_phone(text):
     return matches[0] if matches else None
 
 
+def extract_links(text):
+    """Extract LinkedIn, GitHub, and Portfolio URLs from text."""
+    links = {
+        'linkedin_url': '',
+        'github_url': '',
+        'portfolio_url': ''
+    }
+    
+    # Specific patterns for LinkedIn and GitHub
+    linkedin_pattern = r'(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+\/?'
+    github_pattern = r'(?:https?:\/\/)?(?:www\.)?github\.com\/[a-zA-Z0-9_-]+\/?'
+    
+    linkedin_match = re.search(linkedin_pattern, text, re.IGNORECASE)
+    if linkedin_match:
+        links['linkedin_url'] = linkedin_match.group(0)
+        
+    github_match = re.search(github_pattern, text, re.IGNORECASE)
+    if github_match:
+        links['github_url'] = github_match.group(0)
+        
+    # General URL pattern for portfolio (excluding linkedin/github and common non-portfolio links)
+    url_pattern = r'(?:https?:\/\/)?(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{2,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*)'
+    matches = re.findall(url_pattern, text)
+    
+    for match in matches:
+        match_lower = match.lower()
+        if 'linkedin.com' not in match_lower and 'github.com' not in match_lower:
+            # Filter out things that look like email domains or file extensions
+            if '@' not in match and not match_lower.endswith(('.pdf', '.doc', '.docx', '.png', '.jpg')):
+                # Filter out pure domains without path if they are just common words (heuristic)
+                # Just take the first valid looking one
+                if len(match) > 8:
+                    links['portfolio_url'] = match
+                    break
+                    
+    return links
+
+
 def parse_resume(file_path, file_type):
     """
     Main entry point for resume parsing.
@@ -237,11 +275,16 @@ def parse_resume(file_path, file_type):
     skills = extract_skills_from_text(text)
     skill_names = [s['name'] for s in skills]
     
+    links = extract_links(text)
+    
     return {
         'text': text,
         'skills': skills,
         'skill_names': skill_names,
         'email': extract_email(text),
         'phone': extract_phone(text),
+        'linkedin_url': links.get('linkedin_url'),
+        'github_url': links.get('github_url'),
+        'portfolio_url': links.get('portfolio_url'),
         'word_count': len(text.split()) if text else 0
     }

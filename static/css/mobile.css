@@ -175,10 +175,15 @@
   [style*="grid-template-columns:repeat(3, 1fr)"],
   [style*="grid-template-columns: repeat(4, 1fr)"],
   [style*="grid-template-columns:repeat(4,1fr)"],
+  /* ── Two-column sidebar/panel layouts ── */
   [style*="grid-template-columns: 1fr 360px"],
   [style*="grid-template-columns:1fr 360px"],
+  [style*="grid-template-columns: 1fr 350px"],
+  [style*="grid-template-columns:1fr 350px"],
   [style*="grid-template-columns: 1fr 300px"],
   [style*="grid-template-columns:1fr 300px"],
+  [style*="grid-template-columns: 1fr 220px"],
+  [style*="grid-template-columns:1fr 220px"],
   [style*="grid-template-columns: 340px 1fr"],
   [style*="grid-template-columns:340px 1fr"],
   [style*="grid-template-columns: 300px 1fr"],
@@ -538,10 +543,190 @@
 /* ── REPORTS PAGE ─────────────────────────────────────────── */
 @media (max-width: 768px) {
   canvas { max-width: 100% !important; height: auto !important; }
+  .chart-container { height: 250px !important; overflow: hidden; }
 }
 
 /* ── PREVENT HORIZONTAL SCROLL GLOBALLY ──────────────────── */
 body, .wrapper { overflow-x: hidden; }
 @media (max-width: 768px) {
   .wrapper { max-width: 100vw; }
+}
+
+/* ============================================================
+   PHASE 2+ ADDITIONS — Mobile Responsive Implementation Plan
+   ============================================================ */
+
+/* ── RESUME PREVIEW — A4 Canvas Scale-to-Fit ──────────────── */
+@media (max-width: 900px) {
+  #resumePreviewContainer {
+    padding: 8px !important;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+  /* The JS function handles transform:scale() dynamically */
+  #resumeRenderTarget {
+    transform-origin: top left;
+    will-change: transform;
+  }
+  /* Action bar on resume preview wraps gracefully */
+  .resume-action-bar {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: var(--space-3) !important;
+  }
+  .resume-action-bar > div {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .resume-action-bar .btn { flex: 1; min-width: 80px; justify-content: center; }
+}
+
+/* ── OPTIMIZE PAGE — minmax(350px) overflow fix ───────────── */
+@media (max-width: 480px) {
+  [style*="minmax(350px"],
+  [style*="minmax(300px"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── ANALYSIS PAGE — Hero heading scaling ─────────────────── */
+@media (max-width: 600px) {
+  .analysis-hero-title {
+    font-size: 1.8rem !important;
+    letter-spacing: -0.3px !important;
+  }
+}
+@media (max-width: 400px) {
+  .analysis-hero-title { font-size: 1.5rem !important; }
+}
+
+/* ── INTERVIEW PAGE — Header button group ─────────────────── */
+@media (max-width: 480px) {
+  .interview-header-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  .interview-header-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ── DASHBOARD — Stat grid: 4 cards show properly ────────── */
+@media (max-width: 768px) {
+  /* Ensure 4 stat cards show 2-per-row, not 3-col causing orphan */
+  .stat-row.stat-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+@media (max-width: 480px) {
+  .stat-row.stat-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── SETTINGS — Theme 3-card row cramped on small screens ── */
+@media (max-width: 420px) {
+  .settings-theme-row {
+    flex-direction: column !important;
+    gap: var(--space-2) !important;
+  }
+  .settings-theme-row > label {
+    flex: none !important;
+    width: 100%;
+  }
+}
+
+/* ── ROADMAP — Left panel stacks above, scrollable ───────── */
+@media (max-width: 768px) {
+  .roadmap-sidebar {
+    max-height: 220px;
+    overflow-y: auto;
+    margin-bottom: var(--space-4);
+    border-radius: var(--radius-md);
+  }
+}
+
+/* ── PROFILE — Custom modals fit on small screens ─────────── */
+@media (max-width: 768px) {
+  .profile-custom-modal-card {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 85vh !important;
+    margin: auto;
+  }
+  /* Skill import select — let it be full width */
+  [id^="import_skill_"][id$="_cat"] {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* ── COMPANY — header search + Add Startup wrap ───────────── */
+@media (max-width: 600px) {
+  .company-header-controls {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: var(--space-2);
+  }
+  .company-header-controls form,
+  .company-header-controls .btn {
+    width: 100%;
+  }
+  .company-header-controls .search-box {
+    max-width: 100% !important;
+  }
+}
+
+/* ── RESUME BUILDER — sidebar panel order on mobile ───────── */
+@media (max-width: 768px) {
+  .builder-sidebar { order: -1; }
+  .builder-main    { order:  1; }
+}
+
+/* ── VERY SMALL SCREENS (320–360px) ──────────────────────── */
+@media (max-width: 360px) {
+  .page-content { padding: var(--space-2) var(--space-2); }
+  .topbar-page-title { max-width: 90px; font-size: 0.72rem; }
+  .topbar-completion-pill { display: none; }
+  .card-body   { padding: var(--space-3); }
+  .card-header { padding: var(--space-3); }
+  .card-footer { padding: var(--space-2) var(--space-3); }
+  .btn { font-size: 0.8rem; padding: 0.45rem 0.8rem; }
+  .stat-card-value { font-size: var(--text-xl) !important; }
+  /* Tabs: smaller text so 6 tabs fit better */
+  .tab-btn { font-size: 0.72rem; padding: 0.4rem 0.55rem; }
+}
+
+/* ── PRE / CODE in AI output — no horizontal overflow ─────── */
+pre, code {
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+/* ── TOUCH UX — min tap target 44px on all interactive ────── */
+@media (max-width: 768px) {
+  .btn, button, a.btn, .sidebar-nav-link, .option-btn, .tab-btn {
+    min-height: 40px;
+  }
+  .btn-sm { min-height: 34px; }
+}
+
+/* ── RESUME BUILDER — sidebar sticky disabled when stacked ──── */
+@media (max-width: 768px) {
+  .builder-sidebar { position: static !important; top: auto !important; }
+  .builder-main, .builder-sidebar { width: 100%; min-width: 0; }
+}
+
+/* ── PRINT — always render full-width resume for PDF ─────── */
+@media print {
+  #sidebar, .top-navbar, .resume-action-bar { display: none !important; }
+  #main-content { margin-left: 0 !important; }
+  #resumePreviewContainer { padding: 0 !important; }
+  #resumeRenderTarget { transform: none !important; width: 794px !important; }
 }

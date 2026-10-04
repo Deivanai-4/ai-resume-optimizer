@@ -58,7 +58,7 @@
         <div style="display:grid; grid-template-columns:1fr 360px; gap:var(--space-5); align-items:start;">
 
             <!-- â”€â”€ LEFT: TEMPLATE PICKER + WIZARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
-            <div>
+            <div class="builder-main">
 
                 <!-- Flow A: Choose existing resume -->
                 <div id="flowASection" class="card fade-in-up-delay-2" style="margin-bottom:var(--space-5);">
@@ -140,44 +140,39 @@
                                 </button>
                                 <input type="file" id="resumeExtractInput" accept=".pdf,.doc,.docx" style="display:none;" onchange="handleResumeExtract(this)">
                             </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Template Section -->
                 <div class="card fade-in-up-delay-2" style="margin-bottom:var(--space-5);">
                     <div class="card-header">
-                        <span class="card-header-title"><i class="bi bi-grid-3x3-gap-fill text-primary"></i> Choose
-                            Template</span>
-                        <div style="display:flex; gap:var(--space-2);">
-                            <input type="text" class="form-control" id="templateSearch" placeholder="Search..."
-                                style="width:140px; height:32px; font-size:var(--text-xs);"
+                        <span class="card-header-title"><i class="bi bi-grid-3x3-gap-fill text-primary"></i> Choose Template <span id="templateCountBadge" class="badge badge-primary" style="margin-left:6px;"></span></span>
+                        <div style="display:flex; gap:var(--space-2); align-items:center;">
+                            <input type="text" class="form-control" id="templateSearch" placeholder="Search templates..."
+                                style="width:160px; height:32px; font-size:var(--text-xs);"
                                 oninput="filterTemplates(this.value)">
                             <select class="form-select" id="categoryFilter"
-                                style="width:130px; height:32px; font-size:var(--text-xs);"
+                                style="width:160px; height:32px; font-size:var(--text-xs);"
                                 onchange="filterTemplates(document.getElementById('templateSearch').value)">
                                 <option value="">All Categories</option>
-                                {% for cat in
-                                ['Professional','Modern','Creative','Minimal','ATS-Safe','Tech','Academic','Executive']
-                                %}
-                                <option>{{ cat }}</option>
-                                {% endfor %}
                             </select>
                         </div>
                     </div>
                     <div class="card-body">
-                        <input type="hidden" name="template" id="selectedTemplate" value="classic">
-
+                        <input type="hidden" name="template" id="selectedTemplate" value="classic_ats">
                         <div id="templateGrid"
-                            style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:var(--space-3);">
-                            <!-- Templates rendered by JS from config -->
+                            style="display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:var(--space-3); max-height:480px; overflow-y:auto; padding-right:4px;">
+                            <!-- Templates rendered by JS -->
                         </div>
+                        <div id="templateNoResults" style="display:none; text-align:center; padding:var(--space-6); color:var(--text-3); font-size:var(--text-sm);">No templates match your search.</div>
                     </div>
                 </div>
 
             </div><!-- left -->
 
             <!-- â”€â”€ RIGHT: JOB CONTEXT PANEL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
-            <div style="position:sticky; top:calc(var(--topbar-h) + var(--space-4));">
+            <div class="builder-sidebar" style="position:sticky; top:calc(var(--topbar-h) + var(--space-4));">
                 <div class="card fade-in-up-delay-2">
                     <div class="card-header">
                         <span class="card-header-title"><i class="bi bi-bullseye text-primary"></i> Target Role</span>
@@ -265,6 +260,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/resume_templates.js') }}"></script>
 <script src="{{ url_for('static', filename='js/templates.js') }}"></script>
 <script>
     // â”€â”€ Profile data pre-loaded from backend â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -535,8 +531,22 @@
 
     // â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     document.addEventListener('DOMContentLoaded', () => {
-        renderTemplateGrid(NEW_TEMPLATES, 'classic_ats');
-        selectTemplate(NEW_TEMPLATES[0]);
+        // Populate category dropdown from TEMPLATE_CATEGORIES
+        const catEl = document.getElementById('categoryFilter');
+        if (catEl && typeof TEMPLATE_CATEGORIES !== 'undefined') {
+            TEMPLATE_CATEGORIES.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                catEl.appendChild(opt);
+            });
+        }
+
+        const templates = (typeof RESUME_TEMPLATES !== 'undefined') ? RESUME_TEMPLATES : [];
+        renderTemplateGrid(templates, 'classic_ats');
+        const firstTpl = templates.find(t => t.id === 'classic_ats') || templates[0];
+        if (firstTpl) selectTemplate(firstTpl);
+
         // Auto-load first resume data if Flow A is active
         const firstRadio = document.querySelector('input[name="source_resume_id"]:checked');
         if (firstRadio) loadResumeData(firstRadio.value);

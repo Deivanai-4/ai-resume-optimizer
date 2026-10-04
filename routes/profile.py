@@ -22,12 +22,14 @@ def index():
     certifications = ProfileModel.get_certifications(user_id)
     experience = ProfileModel.get_experience(user_id)
     completion = ProfileModel.calculate_completion(user_id)
+    from models.resume import ResumeModel
+    resumes = ResumeModel.get_all(user_id)
     
     return render_template('profile.html',
                            user=user, profile=profile, skills=skills,
                            education=education, projects=projects,
                            certifications=certifications, experience=experience,
-                           profile_completion=completion)
+                           profile_completion=completion, resumes=resumes)
 
 
 @profile_bp.route('/profile/update-basic', methods=['POST'])
@@ -66,7 +68,7 @@ def update_links():
     ProfileModel.update_links(user_id, github, linkedin, portfolio)
     log_activity(user_id, 'profile_update', 'Updated social links')
     flash('Links updated successfully!', 'success')
-    return redirect(url_for('resume_builder.create'))
+    return redirect(url_for('profile.index') + '#links')
 
 
 @profile_bp.route('/profile/upload-photo', methods=['POST'])
@@ -270,7 +272,7 @@ def delete_experience(exp_id):
 @login_required
 def upload_extract():
     """Upload a resume file, extract text, parse with LLM (with regex fallback), and update user profile."""
-    from services.resume_parser import extract_text, extract_skills_from_text, extract_email, extract_phone
+    from services.resume_parser import extract_text, extract_skills_from_text, extract_email, extract_phone, extract_links
     from services.qwen_service import extract_profile_from_resume
     import os
     import uuid
@@ -313,6 +315,15 @@ def upload_extract():
             # --- Regex/heuristic fallback parser ---
             used_fallback = True
             parsed = _parse_resume_with_regex(raw_text)
+
+        # Enforce correct links (override LLM hallucinations like "LinkedIn" or "GitHub")
+        regex_links = extract_links(raw_text)
+        if 'basic' not in parsed:
+            parsed['basic'] = {}
+        for key in ['linkedin_url', 'github_url', 'portfolio_url']:
+            llm_val = parsed['basic'].get(key, '')
+            if not llm_val or '.' not in llm_val or ' ' in llm_val or len(llm_val) < 8:
+                parsed['basic'][key] = regex_links.get(key, '')
 
         # 1. Basic Info
         if parsed.get('basic'):
@@ -376,10 +387,10 @@ def upload_extract():
 def _parse_resume_with_regex(text):
     """
     Fallback regex/heuristic parser for when AI is unavailable.
-    Extracts skills, email, phone and basic name from raw resume text.
+    Extracts skills, email, phone, links and basic name from raw resume text.
     """
     import re
-    from services.resume_parser import extract_skills_from_text, extract_email, extract_phone
+    from services.resume_parser import extract_skills_from_text, extract_email, extract_phone, extract_links
 
     lines = [l.strip() for l in text.splitlines() if l.strip()]
 
@@ -394,6 +405,7 @@ def _parse_resume_with_regex(text):
 
     email = extract_email(text) or ''
     phone = extract_phone(text) or ''
+    links = extract_links(text)
 
     # Extract skills using the existing KNOWN_SKILLS dictionary matcher
     raw_skills = extract_skills_from_text(text)
@@ -446,7 +458,10 @@ def _parse_resume_with_regex(text):
             'email': email,
             'phone': phone,
             'location': '',
-            'career_objective': ''
+            'career_objective': '',
+            'linkedin_url': links.get('linkedin_url', ''),
+            'github_url': links.get('github_url', ''),
+            'portfolio_url': links.get('portfolio_url', '')
         },
         'skills': skills,
         'education': education,
@@ -502,3 +517,193 @@ def api_data():
                         'end_date': str(ex.get('end_date', '') or ''),
                         'is_current': bool(ex.get('is_current'))} for ex in experience],
     })
+
+
+@profile_bp.route('/profile/api/extract-resume', methods=['POST'])
+@login_required
+def api_extract_resume():
+    """Extract data from uploaded resume or existing resume ID without saving."""
+    from services.resume_parser import extract_text, extract_links
+    from services.qwen_service import extract_profile_from_resume
+    import os
+    import uuid
+    from models.resume import ResumeModel
+    from flask import current_app
+
+    user_id = session['user_id']
+    raw_text = None
+    
+    # Check if a resume_id was provided
+    resume_id = request.form.get('resume_id') or (request.json.get('resume_id') if request.is_json else None)
+    if resume_id:
+        resume = ResumeModel.get_by_id(resume_id, user_id)
+        if not resume:
+            return jsonify({'success': False, 'message': 'Resume not found'}), 404
+        raw_text = resume.get('extracted_text')
+        
+        # If it doesn't have extracted text, we might need to parse the file
+        if not raw_text:
+            file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], resume.get('file_path', ''))
+            ext = resume.get('file_type', 'pdf')
+            if os.path.exists(file_path):
+                raw_text = extract_text(file_path, ext)
+    else:
+        # Check if a file was uploaded
+        if 'resume' not in request.files:
+            return jsonify({'success': False, 'message': 'No file uploaded or resume selected'}), 400
+        
+        file = request.files['resume']
+        if file.filename == '':
+            return jsonify({'success': False, 'message': 'No file selected'}), 400
+            
+        ext = file.filename.rsplit('.', 1)[-1].lower()
+        if ext not in ['pdf', 'doc', 'docx']:
+            return jsonify({'success': False, 'message': 'Invalid file type. Please upload PDF or DOCX'}), 400
+            
+        temp_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp')
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_path = os.path.join(temp_dir, f"{uuid.uuid4().hex}_{file.filename}")
+        file.save(temp_path)
+        
+        try:
+            raw_text = extract_text(temp_path, ext)
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    if not raw_text or len(raw_text) < 30:
+        return jsonify({'success': False, 'message': 'Could not extract enough text from file'}), 400
+
+    # Try LLM parsing first, fall back to regex
+    parsed = None
+    used_fallback = False
+    try:
+        parsed = extract_profile_from_resume(raw_text)
+    except Exception:
+        pass
+
+    if not parsed:
+        used_fallback = True
+        parsed = _parse_resume_with_regex(raw_text)
+        
+    # Enforce correct links (override LLM hallucinations like "LinkedIn" or "GitHub")
+    regex_links = extract_links(raw_text)
+    if 'basic' not in parsed:
+        parsed['basic'] = {}
+    for key in ['linkedin_url', 'github_url', 'portfolio_url']:
+        llm_val = parsed['basic'].get(key, '')
+        if not llm_val or '.' not in llm_val or ' ' in llm_val or len(llm_val) < 8:
+            parsed['basic'][key] = regex_links.get(key, '')
+        
+    return jsonify({
+        'success': True, 
+        'data': parsed, 
+        'used_fallback': used_fallback
+    })
+
+@profile_bp.route('/profile/api/save-imported-data', methods=['POST'])
+@login_required
+def save_imported_data():
+    """Save selected fields from the extracted resume to the profile."""
+    user_id = session['user_id']
+    data = request.json
+    
+    if not data:
+        return jsonify({'success': False, 'message': 'No data provided'}), 400
+        
+    try:
+        # Basic Info
+        basic = data.get('basic', {})
+        if basic:
+            current_user = UserModel.get_by_id(user_id) or {}
+            current_profile = ProfileModel.get(user_id) or {}
+            
+            merged_basic = {
+                'full_name': basic.get('full_name') or current_user.get('full_name', ''),
+                'phone': basic.get('phone') or current_profile.get('phone', ''),
+                'location': basic.get('location') or current_profile.get('location', ''),
+                'date_of_birth': basic.get('date_of_birth') or current_profile.get('date_of_birth'),
+                'gender': current_profile.get('gender'),
+                'career_objective': basic.get('career_objective') or current_profile.get('career_objective', '')
+            }
+            
+            # Ensure row exists or update it
+            execute_db(
+                '''INSERT INTO student_profiles (user_id, phone, date_of_birth, gender, location, career_objective, updated_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                   ON DUPLICATE KEY UPDATE
+                   phone=VALUES(phone), date_of_birth=VALUES(date_of_birth), gender=VALUES(gender),
+                   location=VALUES(location), career_objective=VALUES(career_objective), updated_at=NOW()''',
+                (user_id, merged_basic.get('phone'), merged_basic.get('date_of_birth') or None,
+                 merged_basic.get('gender'), merged_basic.get('location'), merged_basic.get('career_objective'))
+            )
+            
+            execute_db('UPDATE users SET full_name=%s WHERE id=%s', (merged_basic.get('full_name'), user_id))
+            if basic.get('full_name'):
+                session['user_name'] = merged_basic.get('full_name')
+
+            # Update links using ON DUPLICATE KEY
+            new_github = basic.get('github_url') or current_profile.get('github_url', '')
+            new_linkedin = basic.get('linkedin_url') or current_profile.get('linkedin_url', '')
+            new_portfolio = basic.get('portfolio_url') or current_profile.get('portfolio_url', '')
+            
+            execute_db(
+                '''INSERT INTO student_profiles (user_id, github_url, linkedin_url, portfolio_url)
+                   VALUES (%s, %s, %s, %s)
+                   ON DUPLICATE KEY UPDATE
+                   github_url=VALUES(github_url), linkedin_url=VALUES(linkedin_url), portfolio_url=VALUES(portfolio_url)''',
+                (user_id, new_github, new_linkedin, new_portfolio)
+            )
+            
+        # Experience
+        existing_exp = ProfileModel.get_experience(user_id) or []
+        for exp in data.get('experience', []):
+            if exp.get('company_name') or exp.get('job_title'):
+                if not any(e['company_name'] == exp.get('company_name') and e['job_title'] == exp.get('job_title') for e in existing_exp):
+                    end_date = exp.get('end_date', '')
+                    is_current = str(end_date).lower() in ['present', 'current', 'now', '']
+                    exp['is_current'] = is_current
+                    ProfileModel.add_experience(user_id, exp)
+                
+        # Education
+        existing_edu = ProfileModel.get_education(user_id) or []
+        for edu in data.get('education', []):
+            if edu.get('institution') or edu.get('degree'):
+                if not any(e['institution'] == edu.get('institution') and e['degree'] == edu.get('degree') for e in existing_edu):
+                    ProfileModel.add_education(user_id, edu)
+                
+        # Projects
+        existing_proj = ProfileModel.get_projects(user_id) or []
+        for proj in data.get('projects', []):
+            if proj.get('title'):
+                if not any(p['title'] == proj.get('title') for p in existing_proj):
+                    ProfileModel.add_project(user_id, proj)
+                
+        # Certifications
+        existing_cert = ProfileModel.get_certifications(user_id) or []
+        for cert in data.get('certifications', []):
+            if cert.get('cert_name'):
+                if not any(c['cert_name'] == cert.get('cert_name') for c in existing_cert):
+                    ProfileModel.add_certification(user_id, cert)
+                
+        # Skills
+        existing_skills = ProfileModel.get_skills(user_id) or []
+        for skill in data.get('skills', []):
+            if skill.get('skill_name'):
+                if not any(s['skill_name'].lower() == skill.get('skill_name').lower() for s in existing_skills):
+                    ProfileModel.add_skill(
+                        user_id,
+                        skill['skill_name'],
+                        skill.get('category', 'Other'),
+                        skill.get('proficiency', 'Intermediate'),
+                        skill.get('proficiency_percent', 50)
+                    )
+                
+        ProfileModel.calculate_completion(user_id)
+        log_activity(user_id, 'profile_import', 'Imported data from resume')
+        
+        return jsonify({'success': True, 'message': 'Imported data saved successfully'})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Error saving data: {str(e)}'}), 500

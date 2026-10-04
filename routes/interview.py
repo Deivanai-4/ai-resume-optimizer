@@ -1,5 +1,5 @@
 """Interview Preparation Blueprint."""
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, current_app
 from utils.decorators import login_required
 from utils.helpers import log_activity, parse_json_field
 from models.company import CompanyModel
@@ -144,7 +144,7 @@ def generate():
             user_projects=[dict(p) for p in (user_projects or [])],
             job_description=resume_text[:600],
         )
-        
+
         questions = response.get("questions", [])
 
         # Filter by difficulty if specified
@@ -152,32 +152,62 @@ def generate():
             filtered = [q for q in questions if q.get('diff', 'Medium').lower() == difficulty.lower()]
             questions = filtered if filtered else questions
 
+        # ── Valid DB category values ──────────────────────────────────────────
+        _VALID_DB_CATS = {'Technical', 'HR', 'Coding', 'Aptitude',
+                          'Company Specific', 'Logical Reasoning', 'Personalized'}
+
+        def _sanitize_cat(cat):
+            if cat in _VALID_DB_CATS:
+                return cat
+            c = (cat or '').lower()
+            if 'hr' in c or 'behavioral' in c:
+                return 'HR'
+            if 'coding' in c:
+                return 'Coding'
+            if 'aptitude' in c:
+                return 'Aptitude'
+            if 'logical' in c or 'reasoning' in c:
+                return 'Logical Reasoning'
+            if 'company' in c:
+                return 'Company Specific'
+            return 'Technical'
+
         import json
         session_metadata = {
             "company": response.get("company", {}),
-            "role": response.get("role", {}),
+            "role":    response.get("role", {}),
             "recommended_topics": response.get("recommended_topics", [])
         }
         session_id = execute_db(
-            '''INSERT INTO interview_sessions (user_id, company_id, resume_id, session_metadata) VALUES (%s,%s,%s,%s)''',
-            (user_id, company_id if company_id else None, resume_id if resume_id else None, json.dumps(session_metadata)),
+            '''INSERT INTO interview_sessions (user_id, company_id, resume_id, session_metadata)
+               VALUES (%s,%s,%s,%s)''',
+            (user_id, company_id or None, resume_id or None, json.dumps(session_metadata)),
             get_id=True
         )
 
         args_list = []
         for q in questions:
-            options_json = json.dumps(q.get('options', [])) if q.get('options') else None
+            q_text = q.get('q') or q.get('question', '')
+            if not q_text:
+                continue
+            options_json = json.dumps(q['options']) if q.get('options') else None
             correct_answer = q.get('correct_answer', '')
+            cat = _sanitize_cat(q.get('cat', 'Technical'))
+            diff_val = q.get('diff', difficulty if difficulty != 'All' else 'Medium')
+            if diff_val not in ('Easy', 'Medium', 'Hard'):
+                diff_val = 'Medium'
             args_list.append((
-                user_id, company_id if company_id else None, resume_id if resume_id else None, session_id, q['q'], '',
-                q.get('cat', 'Technical'), q.get('diff', difficulty if difficulty != 'All' else 'Medium'),
+                user_id, company_id or None, resume_id or None, session_id,
+                q_text, '',
+                cat, diff_val,
                 q.get('tip', ''), options_json, correct_answer
             ))
-            
+
         if args_list:
             saved_count = execute_many_db(
-                '''INSERT INTO interview_questions (user_id, company_id, resume_id, session_id, question, answer,
-                   category, difficulty, ai_tip, options, correct_answer)
+                '''INSERT INTO interview_questions
+                   (user_id, company_id, resume_id, session_id, question, answer,
+                    category, difficulty, ai_tip, options, correct_answer)
                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',
                 args_list
             )
@@ -185,13 +215,16 @@ def generate():
             saved_count = 0
 
         log_activity(user_id, 'interview_generate',
-                     f'Generated {saved_count} {difficulty} interview questions for {job_title} at {company_name}')
-        flash(f'{saved_count} fresh interview questions generated for {job_title}! 🎯', 'success')
+                     f'Generated {saved_count} MCQ questions for {job_title} at {company_name}')
+        flash(f'✅ {saved_count} MCQ questions generated for {job_title}! 🎯', 'success')
         return redirect(url_for('interview.index', session_id=session_id))
 
     except Exception as e:
-        flash(f'Failed to generate questions. Please try again. Error: {str(e)[:150]}', 'danger')
+        import traceback
+        current_app.logger.error(f"Interview generate error: {traceback.format_exc()}")
+        flash(f'Failed to generate questions. Error: {str(e)[:200]}', 'danger')
         return redirect(url_for('interview.index'))
+
 
 
 

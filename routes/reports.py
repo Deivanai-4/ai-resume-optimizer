@@ -39,7 +39,7 @@ def generate():
     
     if analysis_id:
         analysis = AnalysisModel.get_by_id(analysis_id, user_id)
-    elif report_type in ['ATS', 'Resume']:
+    else:
         recent = AnalysisModel.get_latest(user_id)
         if recent:
             analysis = recent

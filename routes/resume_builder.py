@@ -23,6 +23,7 @@ from utils.helpers import log_activity, allowed_file
 from models.resume import ResumeModel
 from models.company import CompanyModel
 from models.generated_resume import GeneratedResumeModel
+from database.db import query_db
 
 logger = logging.getLogger(__name__)
 
@@ -444,3 +445,78 @@ def api_list():
         'template':   g.get('template', 'classic'),
         'created_at': str(g.get('created_at', '')),
     } for g in gens])
+
+# ---------------------------------------------------------------------------
+# GET /resume/convert-to-source/<id>  — Make a generated resume into a source resume
+# ---------------------------------------------------------------------------
+
+def _convert_gen_to_text(content_json):
+    parts = []
+    if 'candidate' in content_json:
+        c = content_json['candidate']
+        parts.append(f"{c.get('name', '')}\n{c.get('email', '')} | {c.get('phone', '')}\n")
+    if 'professional_summary' in content_json:
+        parts.append(f"SUMMARY\n{content_json['professional_summary']}\n")
+    if 'skills' in content_json:
+        skills = []
+        for k, v in content_json['skills'].items():
+            if isinstance(v, list):
+                skills.extend(v)
+        parts.append(f"SKILLS\n{', '.join(skills)}\n")
+    if 'experience' in content_json:
+        parts.append("EXPERIENCE")
+        for exp in content_json['experience']:
+            parts.append(f"{exp.get('title', '')} at {exp.get('company', '')} ({exp.get('duration', '')})")
+            for b in exp.get('responsibilities', []) or exp.get('bullets', []):
+                parts.append(f"- {b}")
+        parts.append("")
+    if 'education' in content_json:
+        parts.append("EDUCATION")
+        for edu in content_json['education']:
+            parts.append(f"{edu.get('degree', '')} at {edu.get('institution', '')} ({edu.get('year', '')})")
+        parts.append("")
+    if 'projects' in content_json:
+        parts.append("PROJECTS")
+        for proj in content_json['projects']:
+            parts.append(f"{proj.get('name', '')} ({proj.get('technologies', '')})")
+            for b in proj.get('bullets', []) or [proj.get('description', '')]:
+                parts.append(f"- {b}")
+        parts.append("")
+    return "\n".join(parts)
+
+@resume_builder_bp.route('/resume/convert-to-source/<int:gen_id>')
+@login_required
+def convert_to_source(gen_id):
+    user_id = session['user_id']
+    dest = request.args.get('dest', 'tailor')
+    
+    gen = GeneratedResumeModel.get_by_id(gen_id, user_id)
+    if not gen:
+        flash('Resume not found.', 'danger')
+        return redirect(url_for('resumes.index'))
+        
+    text = _convert_gen_to_text(gen.get('content_json', {}))
+    dummy_name = f"Generated_Resume_{gen_id}.txt"
+    
+    # Check if we already created it (prevent duplicates on refresh)
+    existing = query_db("SELECT id FROM resumes WHERE user_id=%s AND original_name=%s AND is_active=1", (user_id, dummy_name), one=True)
+    if existing:
+        resume_id = existing['id']
+    else:
+        resume_id = ResumeModel.create(
+            user_id=user_id,
+            file_name=dummy_name,
+            original_name=dummy_name,
+            file_path='',
+            file_size=len(text),
+            file_type='txt'
+        )
+        skills_list = []
+        for k, v in gen.get('content_json', {}).get('skills', {}).items():
+            if isinstance(v, list): skills_list.extend(v)
+        ResumeModel.update_parsed_data(resume_id, text, skills_list)
+        
+    if dest == 'analysis':
+        return redirect(url_for('analysis.index', resume_id=resume_id))
+    else:
+        return redirect(url_for('optimize.index', resume_id=resume_id))

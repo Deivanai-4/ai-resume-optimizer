@@ -11,7 +11,7 @@
         <h1 style="font-size:var(--text-2xl); font-weight:800; margin-bottom:var(--space-1);">Interview Preparation</h1>
         <p style="color:var(--text-3); font-size:var(--text-sm); margin:0;">Practice with AI-generated questions, MCQ tests and coding challenges.</p>
     </div>
-    <div style="display:flex; gap:var(--space-3);">
+    <div style="display:flex; gap:var(--space-3);" class="interview-header-actions">
         <button class="btn btn-gradient" id="startMCQBtn" onclick="startMCQTest()">
             <i class="bi bi-lightning-charge-fill"></i> Start MCQ Test
         </button>
@@ -52,10 +52,10 @@
 
 <!-- ── TARGET ROLE & COMPANY INTELLIGENCE ───────────────────── -->
 {% if current_session and current_session.metadata %}
-<div class="card fade-in-up-delay-1" style="margin-bottom:var(--space-5); background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-700) 100%); color: white; border: none;">
+<div class="card fade-in-up-delay-1" style="margin-bottom:var(--space-5); background: linear-gradient(135deg, var(--primary-700) 0%, var(--primary-500) 100%); color: white; border: none;">
     <div class="card-body">
         <h3 style="margin-bottom:var(--space-4); color:white; font-size:var(--text-lg); display:flex; align-items:center; gap:var(--space-2);">
-            <i class="bi bi-building-fill-check" style="color:var(--primary-200);"></i> 
+            <i class="bi bi-building-fill-check" style="color:var(--primary-100);"></i> 
             {{ current_session.metadata.company.name | default('Target Company') }} — {{ current_session.metadata.role.title | default('Target Role') }}
         </h3>
         
@@ -127,28 +127,72 @@
             {% if q.ai_tip %}
             <div style="background:var(--primary-50); border-radius:var(--radius-sm); padding:var(--space-3); font-size:var(--text-sm); margin-top:var(--space-2);">
                 <strong style="color:var(--primary);"><i class="bi bi-lightbulb-fill"></i> AI Tip:</strong>
-                <p style="margin:var(--space-1) 0 0; color:var(--primary-700); line-height:1.6;">{{ q.ai_tip }}</p>
+                <p class="ai-tip-text" style="margin:var(--space-1) 0 0; color:var(--primary-700); line-height:1.6;">{{ q.ai_tip }}</p>
             </div>
             {% endif %}
-            <!-- Textarea for user answer -->
+            <!-- MCQ options — answer hidden until submitted -->
             {% if q.options_list %}
-            <div class="aptitude-options" style="margin-top:var(--space-4); display:flex; flex-direction:column; gap:var(--space-2);">
+            <div class="aptitude-options" style="margin-top:var(--space-4); display:flex; flex-direction:column; gap:var(--space-2);"
+                 data-q-id="{{ q.id }}"
+                 data-correct="{{ q.correct_answer | default('') }}">
                 {% for opt in q.options_list %}
-                <label style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); cursor:pointer; transition:all 0.2s;" class="apt-option-label">
-                    <input type="radio" name="q_{{ q.id }}" value="{{ opt }}" {% if q.user_answer == opt %}checked{% endif %} onchange="saveAnswer({{ q.id }}, this.value)" style="accent-color:var(--primary); transform:scale(1.2);">
-                    <span style="font-size:var(--text-sm); color:var(--text-1);">{{ opt }}</span>
+                {% set is_answered = q.user_answer and q.user_answer != '' %}
+                {% set is_selected = q.user_answer == opt %}
+                {% set is_correct_opt = q.correct_answer == opt %}
+                <label class="apt-option-label {{ 'opt-correct' if (is_answered and is_correct_opt) else 'opt-wrong' if (is_answered and is_selected and not is_correct_opt) else '' }}"
+                       style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3); background:var(--surface);
+                              border:2px solid {{ 'var(--success)' if (is_answered and is_correct_opt) else 'var(--danger)' if (is_answered and is_selected and not is_correct_opt) else 'var(--border)' }};
+                              border-radius:var(--radius-sm); cursor:{{ 'default' if is_answered else 'pointer' }}; transition:all 0.2s;">
+                    <input type="radio" name="q_{{ q.id }}" value="{{ opt }}"
+                           {% if is_selected %}checked{% endif %}
+                           {% if is_answered %}disabled{% endif %}
+                           onchange="submitMCQAnswer({{ q.id }}, this.value, this.closest('.aptitude-options'))"
+                           style="accent-color:var(--primary); transform:scale(1.2);">
+                    <span style="font-size:var(--text-sm); color:var(--text-1); flex:1;">{{ opt }}</span>
+                    {% if is_answered and is_correct_opt %}
+                    <i class="bi bi-check-circle-fill" style="color:var(--success); font-size:1rem;"></i>
+                    {% elif is_answered and is_selected and not is_correct_opt %}
+                    <i class="bi bi-x-circle-fill" style="color:var(--danger); font-size:1rem;"></i>
+                    {% endif %}
                 </label>
                 {% endfor %}
+
+                <!-- Feedback row (shown after answering) -->
+                {% if q.user_answer %}
+                <div style="margin-top:var(--space-2); padding:var(--space-3); border-radius:var(--radius-sm);
+                            background:{{ 'var(--success-100)' if q.user_answer == q.correct_answer else 'rgba(239,68,68,0.08)' }};
+                            border-left:4px solid {{ 'var(--success)' if q.user_answer == q.correct_answer else 'var(--danger)' }};">
+                    <div style="font-weight:700; font-size:var(--text-sm);
+                                color:{{ 'var(--success)' if q.user_answer == q.correct_answer else 'var(--danger)' }};">
+                        {{ '✅ Correct!' if q.user_answer == q.correct_answer else '❌ Incorrect' }}
+                        {% if q.user_answer != q.correct_answer %}
+                        — Correct answer: <strong>{{ q.correct_answer }}</strong>
+                        {% endif %}
+                    </div>
+                    {% if q.ai_tip %}
+                    <div style="margin-top:var(--space-1); font-size:var(--text-xs); color:var(--text-2); line-height:1.5;">
+                        💡 {{ q.ai_tip }}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
             {% else %}
+            <!-- Open-ended question (HR / Behavioral) -->
             <textarea class="form-control" style="margin-top:var(--space-3);" rows="3"
-                      placeholder="Enter your answer here..."
+                      placeholder="Type your answer here…"
                       onchange="saveAnswer({{ q.id }}, this.value)">{{ q.user_answer or '' }}</textarea>
+            {% if q.ai_tip and not q.user_answer %}
+            <div style="font-size:var(--text-xs); color:var(--text-3); margin-top:var(--space-2);">
+                <i class="bi bi-lightbulb"></i> <em>Tip: {{ q.ai_tip }}</em>
+            </div>
+            {% endif %}
             {% endif %}
         </div>
         {% endfor %}
     </div>
 </div>
+
 {% else %}
 <div class="cta-banner fade-in-up-delay-2" style="margin-bottom:var(--space-5);">
     <div>
@@ -269,7 +313,7 @@
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
-        <form action="{{ url_for('interview.generate') }}" method="POST" id="genForm" onsubmit="showAILoading(['Analyzing job requirements...', 'Generating tailored questions...', 'Formatting responses...'])">
+        <form action="{{ url_for('interview.generate') }}" method="POST" id="genForm">
             <div style="display:flex; flex-direction:column; gap:var(--space-4);">
                 <div>
                     <label class="form-label">Target Company</label>
@@ -326,6 +370,54 @@ function saveAnswer(qId, answer) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answer })
     });
+}
+
+// ── MCQ Answer Submit — shows correct/incorrect live ────────
+function submitMCQAnswer(qId, selectedValue, container) {
+    saveAnswer(qId, selectedValue);
+    const correctValue = container.dataset.correct;
+    const labels = container.querySelectorAll('label.apt-option-label');
+    const radios  = container.querySelectorAll('input[type="radio"]');
+    radios.forEach(r => r.disabled = true);
+    labels.forEach(label => {
+        const radio = label.querySelector('input[type="radio"]');
+        const opt = radio ? radio.value : '';
+        label.style.cursor = 'default';
+        if (opt === correctValue) {
+            label.style.border = '2px solid var(--success)';
+            label.style.background = 'rgba(16,185,129,0.07)';
+            if (!label.querySelector('.opt-icon')) {
+                const icon = document.createElement('i');
+                icon.className = 'bi bi-check-circle-fill opt-icon';
+                icon.style.cssText = 'color:var(--success);font-size:1rem;margin-left:auto;';
+                label.appendChild(icon);
+            }
+        } else if (opt === selectedValue) {
+            label.style.border = '2px solid var(--danger)';
+            label.style.background = 'rgba(239,68,68,0.07)';
+            if (!label.querySelector('.opt-icon')) {
+                const icon = document.createElement('i');
+                icon.className = 'bi bi-x-circle-fill opt-icon';
+                icon.style.cssText = 'color:var(--danger);font-size:1rem;margin-left:auto;';
+                label.appendChild(icon);
+            }
+        }
+    });
+    if (!container.querySelector('.mcq-feedback')) {
+        const isCorrect = selectedValue === correctValue;
+        const card = container.closest('.question-card');
+        const tipEl = card ? card.querySelector('.ai-tip-text') : null;
+        const tipText = tipEl ? tipEl.textContent.trim() : '';
+        const fb = document.createElement('div');
+        fb.className = 'mcq-feedback';
+        fb.style.cssText = `margin-top:8px;padding:12px 14px;border-radius:8px;
+            background:${isCorrect?'rgba(16,185,129,0.1)':'rgba(239,68,68,0.08)'};
+            border-left:4px solid ${isCorrect?'var(--success)':'var(--danger)'};`;
+        fb.innerHTML = `<div style="font-weight:700;font-size:0.85rem;color:${isCorrect?'var(--success)':'var(--danger)'};">
+            ${isCorrect ? '✅ Correct!' : `❌ Incorrect — Correct answer: <strong>${correctValue}</strong>`}
+        </div>${tipText?`<div style="margin-top:6px;font-size:0.75rem;color:var(--text-2);line-height:1.5;">💡 ${tipText}</div>`:''}`;
+        container.appendChild(fb);
+    }
 }
 
 // ── MCQ Test Engine ─────────────────────────────────────────

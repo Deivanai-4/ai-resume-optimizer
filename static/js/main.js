@@ -330,6 +330,8 @@ function showAILoading(steps = [], containerId = 'aiLoadingOverlay') {
     const stepsEl = document.getElementById(`${containerId}Steps`);
     if (!stepsEl) return overlay;
 
+    stepsEl.innerHTML = ''; // Clear any existing steps
+
     steps.forEach((text, i) => {
         const step = document.createElement('div');
         step.className = 'ai-step';
@@ -339,6 +341,11 @@ function showAILoading(steps = [], containerId = 'aiLoadingOverlay') {
             <span>${text}</span>`;
         stepsEl.appendChild(step);
     });
+
+    // Clear any existing animation loop on this overlay
+    if (overlay.dataset.animationId) {
+        clearTimeout(parseInt(overlay.dataset.animationId));
+    }
 
     // Animate steps
     let current = 0;
@@ -353,11 +360,11 @@ function showAILoading(steps = [], containerId = 'aiLoadingOverlay') {
             stepEls[current].classList.add('active');
             current++;
             const delay = 800 + Math.random() * 600;
-            setTimeout(nextStep, delay);
+            overlay.dataset.animationId = setTimeout(nextStep, delay);
         }
     }
 
-    setTimeout(nextStep, 300);
+    overlay.dataset.animationId = setTimeout(nextStep, 300);
     return overlay;
 }
 

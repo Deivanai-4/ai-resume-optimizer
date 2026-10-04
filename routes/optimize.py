@@ -21,6 +21,9 @@ def index():
     companies = CompanyModel.get_all(limit=20)
     recent_analyses = AnalysisModel.get_recent(user_id, limit=3)
     
+    # Pre-selected from query params
+    resume_id = request.args.get('resume_id', type=int)
+    
     # Load existing optimized resume if selected
     opt_id = request.args.get('opt_id', type=int)
     optimized = None
@@ -39,7 +42,8 @@ def index():
                            resumes=resumes,
                            companies=companies,
                            recent_analyses=recent_analyses,
-                           optimized=optimized)
+                           optimized=optimized,
+                           preselect_resume=resume_id)
 
 
 @optimize_bp.route('/optimize/run', methods=['POST'])

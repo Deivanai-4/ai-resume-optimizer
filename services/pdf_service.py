@@ -148,9 +148,15 @@ def generate_pdf_report(user, profile, analysis, report_type='Career', output_pa
         doc.build(story)
         return output_path
         
-    except ImportError:
+    except ImportError as e:
+        import logging
+        logging.error(f"PDF generation ImportError: {str(e)}")
         return None
     except Exception as e:
+        import logging
+        logging.error(f"PDF generation Exception: {str(e)}")
+        import traceback
+        logging.error(traceback.format_exc())
         return None
 
 

@@ -275,6 +275,10 @@ Schema:
     "email": "...",
     "phone": "...",
     "location": "...",
+    "date_of_birth": "YYYY-MM-DD",
+    "linkedin_url": "...",
+    "github_url": "...",
+    "portfolio_url": "...",
     "career_objective": "..."
   }},
   "skills": [

@@ -11,14 +11,19 @@
         <h1 style="font-size:var(--text-2xl); font-weight:800; margin-bottom:var(--space-1);">Company Intelligence</h1>
         <p style="color:var(--text-3); font-size:var(--text-sm); margin:0;">Explore companies, their tech stacks, and how well your profile matches.</p>
     </div>
-    <form action="{{ url_for('company.index') }}" method="GET" style="display:flex; gap:var(--space-2);">
-        <div class="search-box" style="max-width:280px;">
-            <i class="bi bi-search search-icon"></i>
-            <input type="text" name="q" class="form-control" placeholder="Search companies…"
-                   value="{{ search_query }}" autocomplete="off">
-        </div>
-        <button type="submit" class="btn btn-primary btn-sm">Search</button>
-    </form>
+    <div style="display:flex; gap:var(--space-2);" class="company-header-controls">
+        <form action="{{ url_for('company.index') }}" method="GET" style="display:flex; gap:var(--space-2);">
+            <div class="search-box" style="max-width:280px;">
+                <i class="bi bi-search search-icon"></i>
+                <input type="text" name="q" class="form-control" placeholder="Search companies…"
+                       value="{{ search_query }}" autocomplete="off">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Search</button>
+        </form>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addStartupModal">
+            <i class="bi bi-plus-lg"></i> Add Startup
+        </button>
+    </div>
 </div>
 
 {% if selected_company %}
@@ -363,6 +368,48 @@
 {% endif %}
 
 </div><!-- stagger-children -->
+{% endblock %}
+
+{% block modals %}
+<!-- Add Startup Modal -->
+<div class="modal fade" id="addStartupModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-building-add text-primary me-2"></i> Add Startup Company</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('company.add_company') }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Company Name *</label>
+                        <input type="text" name="name" class="form-control" required placeholder="e.g. OpenAI">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Industry</label>
+                        <input type="text" name="industry" class="form-control" placeholder="e.g. Artificial Intelligence">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Location / HQ</label>
+                        <input type="text" name="location" class="form-control" placeholder="e.g. San Francisco, CA">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Website URL</label>
+                        <input type="url" name="website" class="form-control" placeholder="https://...">
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label">Short Description</label>
+                        <textarea name="description" class="form-control" rows="3" placeholder="What does this startup do?"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Add Company</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <!-- AI Generation Overlay -->
 <div id="ai-loading-overlay" style="
@@ -389,7 +436,9 @@
 <style>
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 </style>
+{% endblock %}
 
+{% block scripts %}
 <script>
 function generateAIProfile(companyName) {
     const btn = document.getElementById('ai-generate-btn');

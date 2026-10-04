@@ -572,8 +572,30 @@ def generate_learning_roadmap(
 
 
 # ---------------------------------------------------------------------------
-# ── INTERVIEW QUESTIONS ──────────────────────────────────────────────────────
+# ── INTERVIEW QUESTIONS — MCQ GENERATION ────────────────────────────────────
 # ---------------------------------------------------------------------------
+
+# Valid category enum values in the DB
+_VALID_CATEGORIES = {'Technical', 'HR', 'Coding', 'Aptitude', 'Company Specific',
+                     'Logical Reasoning', 'Personalized'}
+
+def _safe_cat(cat: str) -> str:
+    """Map a category string to a valid DB enum value."""
+    if cat in _VALID_CATEGORIES:
+        return cat
+    c = (cat or '').lower()
+    if 'hr' in c or 'behavioral' in c:
+        return 'HR'
+    if 'coding' in c or 'program' in c:
+        return 'Coding'
+    if 'aptitude' in c or 'quant' in c or 'math' in c:
+        return 'Aptitude'
+    if 'logical' in c or 'reasoning' in c:
+        return 'Logical Reasoning'
+    if 'company' in c:
+        return 'Company Specific'
+    return 'Technical'
+
 
 def generate_interview_questions(
     job_title: str,
@@ -586,13 +608,13 @@ def generate_interview_questions(
     user_experience: list = None,
     user_projects: list = None,
     job_description: str = "",
-) -> list:
-    """Generate fresh, non-repeating, AI-powered interview questions using a structured prompt.
+) -> dict:
+    """Generate fresh, placement-style MCQ interview questions.
 
-    Falls back to a large static pool if the AI is unavailable.
+    Every question has 4 options, one correct_answer, and an explanation.
+    Falls back to a large static MCQ pool when AI is unavailable.
     """
     import random
-    import json as _json
 
     if seen_questions is None:
         seen_questions = set()
@@ -603,314 +625,231 @@ def generate_interview_questions(
     if user_projects is None:
         user_projects = []
 
-    # ── TRY AI-POWERED GENERATION FIRST ──────────────────────────────────────
+    # ── TRY AI FIRST ─────────────────────────────────────────────────────────
     try:
         from flask import current_app
         from services.qwen_service import call_qwen, parse_qwen_json
 
         token = (current_app.config.get("QWEN_TOKEN") or current_app.config.get("HF_TOKEN") or "").strip()
         if token:
-            # Build concise user context strings for the prompt
-            skills_str = ", ".join(user_skills[:15]) if user_skills else "Not specified"
+            skills_str = ", ".join((user_skills + company_skills)[:15]) or "General CS"
             exp_str = "; ".join(
                 f"{e.get('job_title','')} at {e.get('company_name','')}" for e in (user_experience or [])[:3]
-            ) or "Fresher / No experience"
-            proj_str = "; ".join(
-                f"{p.get('title','')} ({p.get('technologies','')})" for p in (user_projects or [])[:4]
-            ) or "No projects listed"
+            ) or "Fresher"
+            seen_str = "\n- ".join(list(seen_questions)[:60]) if seen_questions else "None"
 
-            # Build a list of seen questions to explicitly tell the LLM to avoid them
-            seen_list = list(seen_questions)[:100]  # Cap at 100 to avoid token bloat
-            seen_str = "\\n- ".join(seen_list) if seen_list else "None"
+            prompt = (
+                f"You are a placement interview question generator.\n\n"
+                f"TARGET ROLE: {job_title}\n"
+                f"COMPANY: {company_name}\n"
+                f"REQUIRED SKILLS: {skills_str}\n"
+                f"CANDIDATE EXPERIENCE: {exp_str}\n\n"
+                f"PREVIOUSLY ASKED (DO NOT REPEAT):\n{seen_str}\n\n"
+                f"GENERATE EXACTLY 20 placement-style MCQs.\n\n"
+                f"STRICT RULES:\n"
+                f"1. Every question MUST have EXACTLY 4 options.\n"
+                f"2. EXACTLY ONE correct answer.\n"
+                f"3. Each item needs: question, options (list of 4), correct_answer (exact text of correct option), explanation, category, difficulty, topic.\n"
+                f"4. Do NOT put A) B) inside option strings.\n"
+                f"5. correct_answer must match one of the 4 options exactly.\n"
+                f"6. Categories (use ONLY these): Technical, Aptitude, Coding, Logical Reasoning, HR\n"
+                f"7. Difficulty: Easy, Medium, or Hard\n"
+                f"8. Mix: 5 Easy, 10 Medium, 5 Hard minimum.\n"
+                f"9. Include all 5 categories.\n"
+                f"10. Return ONLY valid JSON. No markdown, no ``` fences.\n\n"
+                f"JSON STRUCTURE:\n"
+                f'{{\n'
+                f'  "questions": [\n'
+                f'    {{\n'
+                f'      "question": "What does OOP stand for?",\n'
+                f'      "options": ["Object Oriented Programming","Optimized Object Process","Online Open Protocol","Object Overriding Procedure"],\n'
+                f'      "correct_answer": "Object Oriented Programming",\n'
+                f'      "explanation": "OOP = Object Oriented Programming.",\n'
+                f'      "category": "Technical",\n'
+                f'      "difficulty": "Easy",\n'
+                f'      "topic": "OOP"\n'
+                f'    }}\n'
+                f'  ],\n'
+                f'  "company": {{"name": "{company_name}", "important_skills": [], "company_culture": "", "interview_process": []}},\n'
+                f'  "role": {{"title": "{job_title}", "responsibilities": [], "expected_knowledge": []}},\n'
+                f'  "recommended_topics": [{{"topic": "", "priority": "High", "reason": ""}}]\n'
+                f'}}'
+            )
 
-            prompt = f"""You are an expert technical recruiter, company intelligence analyst, and interview preparation specialist.
-
-You are generating interview preparation content for a career intelligence platform.
-
-USER INFORMATION:
-- User name: "{user_name}"
-- Target role: "{job_title}"
-- User skills: {skills_str}
-- User experience: {exp_str}
-- User projects: {proj_str}
-
-COMPANY INFORMATION:
-- Company: "{company_name}"
-- Job description: "{job_description[:600] if job_description else 'Not provided'}"
-
-PREVIOUSLY ASKED QUESTIONS (DO NOT GENERATE THESE):
-- {seen_str}
-
-Your task is to generate structured interview preparation information specifically for this company and target role.
-
-IMPORTANT:
-1. Do NOT generate generic questions if company/role-specific information is available.
-2. Questions should match the target role: {job_title}.
-3. Questions should consider the user's existing skills and projects.
-4. Identify skills that are likely relevant to the selected role.
-5. Questions must be divided by category and difficulty.
-6. Questions must be suitable for students/freshers unless the user's experience indicates otherwise.
-7. CRITICAL: Avoid repeating the same questions. You MUST generate completely new and different questions from the 'PREVIOUSLY ASKED QUESTIONS' list.
-8. Generate questions that test understanding, not only memorization.
-9. Technical questions should include practical/scenario-based questions where appropriate.
-10. HR questions should be relevant to the company and role.
-11. Aptitude questions should be suitable for placement preparation.
-12. Return ONLY valid JSON.
-13. Do NOT use markdown.
-14. Do NOT include ```json.
-15. Do NOT include explanations outside the JSON.
-
-RETURN EXACTLY THIS JSON STRUCTURE (generate at least 3 questions per difficulty level per section):
-
-{{
-    "company": {{
-        "name": "{company_name}",
-        "industry": "",
-        "headquarters": "",
-        "description": "",
-        "tech_stack": [],
-        "important_skills": [],
-        "common_interview_topics": [],
-        "interview_process": [],
-        "company_culture": ""
-    }},
-    "role": {{
-        "title": "{job_title}",
-        "important_skills": [],
-        "responsibilities": [],
-        "expected_knowledge": []
-    }},
-    "interview_preparation": {{
-        "technical": {{
-            "easy": [{{"question": "", "topic": "", "skill": "", "type": "conceptual", "answer": "", "explanation": ""}}],
-            "medium": [{{"question": "", "topic": "", "skill": "", "type": "scenario", "answer": "", "explanation": ""}}],
-            "hard": [{{"question": "", "topic": "", "skill": "", "type": "problem-solving", "answer": "", "explanation": ""}}]
-        }},
-        "hr": {{
-            "easy": [{{"question": "", "answer_guidance": "", "what_interviewer_checks": ""}}],
-            "medium": [{{"question": "", "answer_guidance": "", "what_interviewer_checks": ""}}],
-            "hard": [{{"question": "", "answer_guidance": "", "what_interviewer_checks": ""}}]
-        }},
-        "aptitude": {{
-            "easy": [{{"question": "", "options": ["", "", "", ""], "correct_answer": "", "explanation": "", "topic": ""}}],
-            "medium": [{{"question": "", "options": ["", "", "", ""], "correct_answer": "", "explanation": "", "topic": ""}}],
-            "hard": [{{"question": "", "options": ["", "", "", ""], "correct_answer": "", "explanation": "", "topic": ""}}]
-        }}
-    }},
-    "personalized_questions": [
-        {{"question": "", "reason": "", "related_skill": "", "related_project": ""}}
-    ],
-    "recommended_topics": [
-        {{"topic": "", "priority": "High", "reason": ""}}
-    ]
-}}"""
-
-            raw = call_qwen(prompt, max_tokens=3000, retries=1)
+            raw = call_qwen(prompt, max_tokens=4000, retries=2, temperature=0.4)
             if raw:
                 data = parse_qwen_json(raw)
-                if data and isinstance(data, dict) and "interview_preparation" in data:
-                    return _convert_ai_response_to_list(data, seen_questions)
-    except Exception:
-        pass  # Fall through to static pool
+                if data and isinstance(data, dict) and "questions" in data:
+                    return _convert_mcq_response(data, seen_questions)
+    except Exception as exc:
+        logger.warning(f"AI interview generation failed: {exc} — using static MCQ pool")
 
-    # ── STATIC FALLBACK POOL ─────────────────────────────────────────────────
-    return _static_question_pool(job_title, company_name, company_skills, seen_questions)
+    return _static_mcq_pool(job_title, company_name, company_skills, seen_questions)
 
 
-def _convert_ai_response_to_list(data: dict, seen_questions: set) -> dict:
-    """Flatten the structured AI JSON response and include metadata."""
+def _convert_mcq_response(data: dict, seen_questions: set) -> dict:
+    """Validate and sanitise the AI MCQ response."""
     import random
     result = []
-    prep = data.get("interview_preparation", {})
-
-    for section_key, cat_label in [("technical", "Technical"), ("hr", "HR"), ("aptitude", "Aptitude")]:
-        section = prep.get(section_key, {})
-        for diff_key, diff_label in [("easy", "Easy"), ("medium", "Medium"), ("hard", "Hard")]:
-            for item in section.get(diff_key, []):
-                q_text = item.get("question", "").strip()
-                if not q_text or q_text.lower() in seen_questions:
-                    continue
-                flat = {
-                    "q":    q_text,
-                    "cat":  cat_label,
-                    "diff": diff_label,
-                    "tip":  item.get("answer", "") or item.get("answer_guidance", "") or item.get("explanation", ""),
-                }
-                if section_key == "aptitude":
-                    flat["options"] = item.get("options", [])
-                    flat["correct_answer"] = item.get("correct_answer", "")
-                result.append(flat)
-
-    # Also include personalized questions
-    for item in data.get("personalized_questions", []):
-        q_text = item.get("question", "").strip()
-        if q_text and q_text.lower() not in seen_questions:
-            result.append({
-                "q":    q_text,
-                "cat":  "Personalized",
-                "diff": "Medium",
-                "tip":  item.get("reason", ""),
-            })
-
+    for item in data.get("questions", []):
+        q_text = (item.get("question") or "").strip()
+        if not q_text or q_text.lower() in seen_questions:
+            continue
+        options = item.get("options", [])
+        if not isinstance(options, list) or len(options) < 2:
+            continue
+        options = [str(o).strip() for o in options[:4]]
+        while len(options) < 4:
+            options.append("—")
+        correct = str(item.get("correct_answer") or "").strip()
+        if correct not in options:
+            correct = options[0]
+        diff = item.get("difficulty", "Medium")
+        if diff not in ("Easy", "Medium", "Hard"):
+            diff = "Medium"
+        result.append({
+            "q":             q_text,
+            "cat":           _safe_cat(item.get("category", "Technical")),
+            "diff":          diff,
+            "tip":           str(item.get("explanation") or "").strip(),
+            "options":       options,
+            "correct_answer": correct,
+            "topic":         str(item.get("topic") or ""),
+        })
     random.shuffle(result)
     for i, q in enumerate(result):
         q["id"] = i + 1
-        
     return {
-        "questions": result,
-        "company": data.get("company", {}),
-        "role": data.get("role", {}),
-        "recommended_topics": data.get("recommended_topics", [])
+        "questions":          result,
+        "company":            data.get("company", {}),
+        "role":               data.get("role", {}),
+        "recommended_topics": data.get("recommended_topics", []),
     }
 
 
-def _static_question_pool(job_title: str, company_name: str, company_skills: list, seen_questions: set) -> list:
-    """Large static question pool used as fallback when AI is unavailable."""
+def _static_mcq_pool(job_title: str, company_name: str, company_skills: list, seen_questions: set) -> dict:
+    """Large static MCQ pool — fallback when AI is unavailable."""
     import random as _rnd
 
     tech_pool = [
-        {"q": "Explain the difference between REST and GraphQL APIs. When would you use each?",        "cat": "Technical", "diff": "Medium"},
-        {"q": "What is the difference between synchronous and asynchronous programming?",               "cat": "Technical", "diff": "Medium"},
-        {"q": "Explain SOLID principles with real-world examples.",                                     "cat": "Technical", "diff": "Hard"},
-        {"q": "What are design patterns? Name and explain three you have used.",                        "cat": "Technical", "diff": "Hard"},
-        {"q": "How would you diagnose and fix a slow database query?",                                  "cat": "Technical", "diff": "Medium"},
-        {"q": "Explain the concept of microservices versus monolithic architecture.",                   "cat": "Technical", "diff": "Hard"},
-        {"q": "What is Docker and why is containerisation useful?",                                     "cat": "Technical", "diff": "Medium"},
-        {"q": "Explain Git branching strategies and when to use merge vs rebase.",                      "cat": "Technical", "diff": "Medium"},
-        {"q": "What is the difference between SQL and NoSQL databases?",                                "cat": "Technical", "diff": "Medium"},
-        {"q": "What is indexing in databases and how does it improve query performance?",               "cat": "Technical", "diff": "Medium"},
-        {"q": "Explain the CAP theorem and its implications for distributed systems.",                  "cat": "Technical", "diff": "Hard"},
-        {"q": "What is a race condition and how do you prevent it?",                                    "cat": "Technical", "diff": "Hard"},
-        {"q": "Describe the differences between threads and processes.",                                "cat": "Technical", "diff": "Medium"},
-        {"q": "What is a memory leak? How do you detect and fix it?",                                   "cat": "Technical", "diff": "Medium"},
-        {"q": "Explain the concept of caching and describe different caching strategies.",              "cat": "Technical", "diff": "Medium"},
-        {"q": "What is CI/CD? Describe a typical pipeline you have worked with.",                       "cat": "Technical", "diff": "Medium"},
-        {"q": "What is the difference between authentication and authorisation?",                       "cat": "Technical", "diff": "Easy"},
-        {"q": "Explain how HTTPS works and the role of SSL/TLS certificates.",                          "cat": "Technical", "diff": "Medium"},
-        {"q": "What is the purpose of an API gateway in a microservices architecture?",                 "cat": "Technical", "diff": "Hard"},
-        {"q": "How does garbage collection work and how can it impact performance?",                     "cat": "Technical", "diff": "Medium"},
-        {"q": "What is test-driven development (TDD) and what are its benefits?",                       "cat": "Technical", "diff": "Medium"},
-        {"q": "Explain the differences between unit, integration, and end-to-end testing.",             "cat": "Technical", "diff": "Medium"},
-        {"q": "What is eventual consistency? How does it differ from strong consistency?",               "cat": "Technical", "diff": "Hard"},
-        {"q": "How do you handle database migrations in a production system?",                          "cat": "Technical", "diff": "Medium"},
-        {"q": "What is the difference between optimistic and pessimistic locking?",                     "cat": "Technical", "diff": "Hard"},
-        {"q": "Describe a time when you had to refactor a large piece of code.",                        "cat": "Technical", "diff": "Medium"},
-        {"q": "What is the Observer pattern and when would you use it?",                                "cat": "Technical", "diff": "Medium"},
-        {"q": "How do load balancers work and what algorithms do they use?",                            "cat": "Technical", "diff": "Medium"},
-        {"q": "What is a message queue? Give examples of when you would use one.",                      "cat": "Technical", "diff": "Medium"},
-        {"q": "Explain the difference between horizontal and vertical scaling.",                        "cat": "Technical", "diff": "Easy"},
+        {"q":"What does HTTP stand for?","options":["HyperText Transfer Protocol","High Transfer Text Protocol","Hyper Transfer Text Process","HyperText Technical Protocol"],"correct_answer":"HyperText Transfer Protocol","cat":"Technical","diff":"Easy","tip":"HTTP is the foundation of data communication on the World Wide Web.","topic":"Networking"},
+        {"q":"Which data structure operates on the LIFO principle?","options":["Queue","Stack","Linked List","Tree"],"correct_answer":"Stack","cat":"Technical","diff":"Easy","tip":"LIFO = Last In First Out. Stack is the classic data structure for this.","topic":"Data Structures"},
+        {"q":"What is the time complexity of Binary Search?","options":["O(n)","O(n log n)","O(log n)","O(1)"],"correct_answer":"O(log n)","cat":"Technical","diff":"Easy","tip":"Binary search halves the search space each step → O(log n).","topic":"Algorithms"},
+        {"q":"Which SQL clause filters grouped results?","options":["WHERE","HAVING","GROUP BY","ORDER BY"],"correct_answer":"HAVING","cat":"Technical","diff":"Medium","tip":"HAVING filters after GROUP BY; WHERE filters before aggregation.","topic":"SQL"},
+        {"q":"What is a primary key in a relational database?","options":["A key that can be NULL","A key that uniquely identifies each row","A foreign reference to another table","A key used for sorting"],"correct_answer":"A key that uniquely identifies each row","cat":"Technical","diff":"Easy","tip":"Primary keys enforce entity integrity and must be unique and NOT NULL.","topic":"DBMS"},
+        {"q":"Which Python keyword creates a generator function?","options":["return","yield","generate","async"],"correct_answer":"yield","cat":"Technical","diff":"Medium","tip":"A function with 'yield' is a generator that lazily produces values.","topic":"Python"},
+        {"q":"What does REST stand for?","options":["Remote Execution State Transfer","Representational State Transfer","Resource Embedded System Transfer","Redundant State Transfer"],"correct_answer":"Representational State Transfer","cat":"Technical","diff":"Easy","tip":"REST is an architectural style for distributed hypermedia systems.","topic":"Web APIs"},
+        {"q":"Which sorting algorithm always has O(n log n) time complexity?","options":["Bubble Sort","Insertion Sort","Merge Sort","Quick Sort"],"correct_answer":"Merge Sort","cat":"Technical","diff":"Medium","tip":"Merge Sort is always O(n log n). Quick Sort is O(n²) in worst case.","topic":"Algorithms"},
+        {"q":"What is polymorphism in OOP?","options":["Hiding internal data","Inheriting from multiple parents","An object's ability to take many forms","Creating multiple constructors"],"correct_answer":"An object's ability to take many forms","cat":"Technical","diff":"Easy","tip":"Polymorphism allows one interface to be used for many data types.","topic":"OOP"},
+        {"q":"Which HTTP status code means 'Not Found'?","options":["200","301","404","500"],"correct_answer":"404","cat":"Technical","diff":"Easy","tip":"404 is the standard response when a resource cannot be found.","topic":"Web"},
+        {"q":"Worst-case time complexity of Quick Sort?","options":["O(n log n)","O(n)","O(n²)","O(log n)"],"correct_answer":"O(n²)","cat":"Technical","diff":"Hard","tip":"Quick Sort degrades to O(n²) when pivot is always min or max.","topic":"Algorithms"},
+        {"q":"What is a deadlock in operating systems?","options":["100% CPU usage","Two processes each waiting for resources held by the other","A memory overflow","An infinite loop"],"correct_answer":"Two processes each waiting for resources held by the other","cat":"Technical","diff":"Hard","tip":"Deadlock: circular wait where each process holds and needs a resource.","topic":"OS"},
+        {"q":"Which design pattern ensures only one instance of a class exists?","options":["Factory","Observer","Singleton","Decorator"],"correct_answer":"Singleton","cat":"Technical","diff":"Medium","tip":"The Singleton pattern restricts a class to a single instance.","topic":"Design Patterns"},
+        {"q":"What does API stand for?","options":["Application Programming Interface","Automated Protocol Interface","Advanced Programming Index","Application Process Integration"],"correct_answer":"Application Programming Interface","cat":"Technical","diff":"Easy","tip":"An API defines how software components interact with each other.","topic":"General CS"},
+        {"q":"Which protocol provides secure communication over the internet?","options":["FTP","HTTP","HTTPS/TLS","SMTP"],"correct_answer":"HTTPS/TLS","cat":"Technical","diff":"Easy","tip":"HTTPS uses TLS to encrypt HTTP traffic.","topic":"Networking"},
+        {"q":"What is the difference between a process and a thread?","options":["No difference","A thread has its own memory space","A process has its own memory; threads share it","Threads cannot be created by processes"],"correct_answer":"A process has its own memory; threads share it","cat":"Technical","diff":"Medium","tip":"Threads share heap; processes have separate address spaces.","topic":"OS"},
+        {"q":"Which data structure is used to implement BFS?","options":["Stack","Priority Queue","Queue","Linked List"],"correct_answer":"Queue","cat":"Technical","diff":"Medium","tip":"BFS uses a FIFO Queue to explore nodes level by level.","topic":"Graph Algorithms"},
+        {"q":"Purpose of normalization in databases?","options":["Compress data","Remove redundancy and organize data efficiently","Encrypt sensitive data","Create backups"],"correct_answer":"Remove redundancy and organize data efficiently","cat":"Technical","diff":"Medium","tip":"Normalization reduces redundancy through 1NF, 2NF, 3NF.","topic":"DBMS"},
+        {"q":"Which Java keyword prevents method overriding?","options":["static","abstract","final","private"],"correct_answer":"final","cat":"Technical","diff":"Medium","tip":"'final' methods cannot be overridden by subclasses.","topic":"Java"},
+        {"q":"What does the 'virtual' keyword enable in C++?","options":["Memory allocation","Operator overloading","Runtime polymorphism via vtable","Template specialization"],"correct_answer":"Runtime polymorphism via vtable","cat":"Technical","diff":"Hard","tip":"Virtual functions enable dynamic dispatch through a virtual table.","topic":"C++"},
     ]
 
-    hr_pool = [
-        {"q": "Tell me about yourself and why you are applying for this role.",       "cat": "HR", "diff": "Easy",   "tip": "2-3 minutes. Professional, relevant, enthusiastic."},
-        {"q": f"Why do you specifically want to work at {company_name}?",             "cat": "HR", "diff": "Easy",   "tip": "Research their products, culture, and mission."},
-        {"q": "Where do you see yourself in 5 years?",                                "cat": "HR", "diff": "Easy",   "tip": "Align your ambition with the company's growth."},
-        {"q": "Describe a challenging project and how you overcame obstacles.",        "cat": "HR", "diff": "Medium", "tip": "Use STAR: Situation, Task, Action, Result."},
-        {"q": "How do you handle tight deadlines and competing priorities?",           "cat": "HR", "diff": "Medium", "tip": "Give a concrete example with outcome."},
-        {"q": "What are your biggest strengths and one area you are improving?",      "cat": "HR", "diff": "Easy",   "tip": "Be honest and show self-awareness."},
-        {"q": "Describe a conflict with a teammate and how you resolved it.",          "cat": "HR", "diff": "Medium", "tip": "Focus on resolution and what you learned."},
-        {"q": "Tell me about a time you failed. What did you learn from it?",          "cat": "HR", "diff": "Medium", "tip": "Show maturity and growth mindset."},
-        {"q": "How do you stay up-to-date with the latest industry trends?",           "cat": "HR", "diff": "Easy",   "tip": "Mention blogs, communities, open-source, courses."},
-        {"q": "Describe a time you had to learn a new technology very quickly.",       "cat": "HR", "diff": "Medium", "tip": "Show adaptability with a specific example."},
-        {"q": "What motivates you in your day-to-day work?",                           "cat": "HR", "diff": "Easy",   "tip": "Be genuine — connect to impact and problem-solving."},
-        {"q": "How do you approach giving and receiving constructive feedback?",        "cat": "HR", "diff": "Medium", "tip": "Show emotional maturity and communication skills."},
-        {"q": "Tell me about a time you led a team or project.",                        "cat": "HR", "diff": "Medium", "tip": "Highlight leadership, ownership, and outcome."},
-        {"q": "How do you prioritise tasks when everything seems equally urgent?",      "cat": "HR", "diff": "Medium", "tip": "Mention frameworks like Eisenhower matrix or MoSCoW."},
-        {"q": "What do you consider your most significant professional achievement?",   "cat": "HR", "diff": "Easy",   "tip": "Choose something measurable with clear impact."},
-        {"q": "How would your previous colleagues or manager describe you?",            "cat": "HR", "diff": "Easy",   "tip": "Be consistent with the strengths you mentioned."},
-        {"q": "Why are you leaving your current or last position?",                     "cat": "HR", "diff": "Medium", "tip": "Stay positive; focus on growth and new opportunities."},
-        {"q": "What kind of work environment do you thrive in?",                        "cat": "HR", "diff": "Easy",   "tip": "Align with the company's known culture."},
-        {"q": "Describe a situation where you met a very tight deadline.",              "cat": "HR", "diff": "Medium", "tip": "Show planning, execution, and results."},
-        {"q": "How do you handle working under pressure or in ambiguous situations?",   "cat": "HR", "diff": "Medium", "tip": "Give examples — show calm, structured thinking."},
+    aptitude_pool = [
+        {"q":"Train travels 300 km in 5 hours. Speed?","options":["50 km/h","60 km/h","65 km/h","55 km/h"],"correct_answer":"60 km/h","cat":"Aptitude","diff":"Easy","tip":"Speed = Distance / Time = 300/5 = 60 km/h.","topic":"Speed & Distance"},
+        {"q":"What is 15% of 240?","options":["34","36","38","32"],"correct_answer":"36","cat":"Aptitude","diff":"Easy","tip":"15% of 240 = (15/100) × 240 = 36.","topic":"Percentages"},
+        {"q":"A does a job in 10 days, B in 15. Together in how many days?","options":["5","6","8","4"],"correct_answer":"6","cat":"Aptitude","diff":"Medium","tip":"Combined rate = 1/10 + 1/15 = 1/6 → 6 days.","topic":"Time & Work"},
+        {"q":"Next in series: 2, 6, 12, 20, 30, ?","options":["40","42","44","38"],"correct_answer":"42","cat":"Aptitude","diff":"Medium","tip":"Differences: 4,6,8,10,12 → 30+12=42.","topic":"Number Series"},
+        {"q":"Item marked at ₹500, sold at 20% discount. Selling price?","options":["₹400","₹380","₹420","₹450"],"correct_answer":"₹400","cat":"Aptitude","diff":"Easy","tip":"SP = 500 × 0.80 = ₹400.","topic":"Discount"},
+        {"q":"Simple interest: ₹5000 at 8% p.a. for 3 years?","options":["₹1100","₹1200","₹1400","₹1000"],"correct_answer":"₹1200","cat":"Aptitude","diff":"Easy","tip":"SI = P×R×T/100 = 5000×8×3/100 = ₹1200.","topic":"Simple Interest"},
+        {"q":"Two pipes fill a tank in 12 and 18 hours. Together in?","options":["6 hours","7.2 hours","8 hours","9 hours"],"correct_answer":"7.2 hours","cat":"Aptitude","diff":"Medium","tip":"Rate = 1/12 + 1/18 = 5/36. Time = 36/5 = 7.2 hrs.","topic":"Pipes & Cisterns"},
+        {"q":"Average of 5 consecutive even numbers is 14. Largest?","options":["16","18","20","22"],"correct_answer":"18","cat":"Aptitude","diff":"Medium","tip":"Numbers: 10,12,14,16,18. Avg = 14. Largest = 18.","topic":"Averages"},
+        {"q":"LCM of 12, 15, and 20?","options":["30","60","45","120"],"correct_answer":"60","cat":"Aptitude","diff":"Medium","tip":"LCM(12,15,20) = 60.","topic":"LCM & HCF"},
+        {"q":"In a class of 40, 60% passed. How many failed?","options":["14","16","18","20"],"correct_answer":"16","cat":"Aptitude","diff":"Easy","tip":"40% failed. 40% of 40 = 16.","topic":"Percentages"},
+    ]
+
+    logical_pool = [
+        {"q":"All cats are animals. All animals have cells. Therefore?","options":["Some cats may not have cells","All cats have cells","Animals are cats","None of the above"],"correct_answer":"All cats have cells","cat":"Logical Reasoning","diff":"Easy","tip":"Syllogism chain: A→B, B→C, so A→C.","topic":"Syllogisms"},
+        {"q":"Odd one out: 2, 3, 5, 7, 9, 11","options":["2","7","9","11"],"correct_answer":"9","cat":"Logical Reasoning","diff":"Easy","tip":"9 = 3×3 is NOT prime. All others are prime.","topic":"Odd One Out"},
+        {"q":"4 days after Saturday is?","options":["Tuesday","Wednesday","Thursday","Monday"],"correct_answer":"Wednesday","cat":"Logical Reasoning","diff":"Easy","tip":"Sat + 4 = Wed.","topic":"Calendar"},
+        {"q":"Man walks 5 km North, 3 km East, 5 km South. Distance from start?","options":["3 km","5 km","8 km","13 km"],"correct_answer":"3 km","cat":"Logical Reasoning","diff":"Medium","tip":"N 5 and S 5 cancel → net 3 km East.","topic":"Direction Sense"},
+        {"q":"Series: 1, 4, 9, 16, 25, ?","options":["30","36","49","32"],"correct_answer":"36","cat":"Logical Reasoning","diff":"Easy","tip":"Perfect squares: 1²,2²,3²,4²,5²,6²=36.","topic":"Number Series"},
+        {"q":"A is sister of B. B is brother of C. A is C's?","options":["Mother","Sister","Aunt","Cousin"],"correct_answer":"Sister","cat":"Logical Reasoning","diff":"Medium","tip":"A and B siblings, B and C siblings → A and C are siblings.","topic":"Blood Relations"},
+        {"q":"ABCD : DCBA :: PQRS : ?","options":["SRQP","QRSP","PQRS","RQPS"],"correct_answer":"SRQP","cat":"Logical Reasoning","diff":"Easy","tip":"Pattern: reverse the sequence.","topic":"Coding-Decoding"},
     ]
 
     coding_pool = [
-        {"q": "Reverse a string without using built-in reverse functions.",                             "cat": "Coding", "diff": "Easy",   "tip": "Two-pointer technique or iterative swap."},
-        {"q": "Find the first non-repeating character in a string.",                                    "cat": "Coding", "diff": "Easy",   "tip": "Hash map frequency count."},
-        {"q": "Given a sorted array, find two numbers that sum to a target.",                           "cat": "Coding", "diff": "Easy",   "tip": "Two-pointer from both ends."},
-        {"q": "Find the maximum subarray sum (Kadane's Algorithm).",                                    "cat": "Coding", "diff": "Medium", "tip": "Track current_sum and max_sum iteratively."},
-        {"q": "Implement binary search on a sorted array.",                                             "cat": "Coding", "diff": "Medium", "tip": "mid = (low + high) // 2 to avoid overflow."},
-        {"q": "Detect a cycle in a linked list.",                                                       "cat": "Coding", "diff": "Medium", "tip": "Floyd's Cycle Detection — fast and slow pointers."},
-        {"q": "Check if a string is a palindrome.",                                                     "cat": "Coding", "diff": "Easy",   "tip": "Compare characters from both ends."},
-        {"q": "Find all permutations of a string.",                                                     "cat": "Coding", "diff": "Medium", "tip": "Use backtracking with a visited array."},
-        {"q": "Given an array, find the missing number from 1 to n.",                                   "cat": "Coding", "diff": "Easy",   "tip": "Expected sum = n*(n+1)/2 minus actual sum."},
-        {"q": "Implement a stack using two queues.",                                                    "cat": "Coding", "diff": "Medium", "tip": "Push to q1, on pop dequeue all to q2, return last."},
-        {"q": "Find the longest common subsequence of two strings.",                                    "cat": "Coding", "diff": "Hard",   "tip": "Dynamic programming — 2D table approach."},
-        {"q": "Merge two sorted linked lists into one sorted list.",                                    "cat": "Coding", "diff": "Easy",   "tip": "Use a dummy node and compare nodes one by one."},
-        {"q": "Find the kth largest element in an unsorted array.",                                     "cat": "Coding", "diff": "Medium", "tip": "Min-heap of size k, or QuickSelect algorithm."},
-        {"q": "Given a matrix, rotate it 90 degrees clockwise in place.",                               "cat": "Coding", "diff": "Medium", "tip": "Transpose then reverse each row."},
-        {"q": "Implement LRU Cache with O(1) get and put operations.",                                  "cat": "Coding", "diff": "Hard",   "tip": "Use OrderedDict or a doubly linked list + hashmap."},
-        {"q": "Find the number of islands in a 2D grid.",                                               "cat": "Coding", "diff": "Medium", "tip": "DFS or BFS, mark visited cells."},
-        {"q": "Check if two strings are anagrams of each other.",                                       "cat": "Coding", "diff": "Easy",   "tip": "Sort both and compare, or use a frequency map."},
-        {"q": "Find the longest substring without repeating characters.",                                "cat": "Coding", "diff": "Medium", "tip": "Sliding window with a set to track current chars."},
-        {"q": "Given a list of intervals, merge all overlapping ones.",                                  "cat": "Coding", "diff": "Medium", "tip": "Sort by start, then greedily merge."},
-        {"q": "Serialize and deserialize a binary tree.",                                               "cat": "Coding", "diff": "Hard",   "tip": "BFS level-order, use null markers for empty nodes."},
+        {"q":"Output of: print(type([])) in Python?","options":["<class 'tuple'>","<class 'dict'>","<class 'list'>","<class 'set'>"],"correct_answer":"<class 'list'>","cat":"Coding","diff":"Easy","tip":"[] creates an empty list.","topic":"Python Basics"},
+        {"q":"Method that removes and returns the last element of a Python list?","options":["remove()","delete()","pop()","discard()"],"correct_answer":"pop()","cat":"Coding","diff":"Easy","tip":"list.pop() removes and returns the last element by default.","topic":"Python Lists"},
+        {"q":"Time complexity of inserting at beginning of Python list?","options":["O(1)","O(log n)","O(n)","O(n²)"],"correct_answer":"O(n)","cat":"Coding","diff":"Medium","tip":"Inserting at index 0 shifts all elements → O(n).","topic":"Data Structures"},
+        {"q":"In Python, 'is' vs '==' difference?","options":["Both check value","'is' checks identity, '==' checks value","'is' checks value, '==' checks identity","They are identical"],"correct_answer":"'is' checks identity, '==' checks value","cat":"Coding","diff":"Medium","tip":"'is' compares object id(), '==' compares values.","topic":"Python Fundamentals"},
+        {"q":"Space complexity of naive recursive Fibonacci?","options":["O(1)","O(n)","O(log n)","O(n²)"],"correct_answer":"O(n)","cat":"Coding","diff":"Hard","tip":"Each call adds a stack frame; max depth n → O(n) space.","topic":"Recursion"},
+        {"q":"What does len('Hello World') return?","options":["10","11","12","9"],"correct_answer":"11","cat":"Coding","diff":"Easy","tip":"'Hello World' has 11 characters including the space.","topic":"Python Basics"},
+    ]
+
+    hr_pool = [
+        {"q":"What does STAR stand for in behavioral interviews?","options":["Skill,Task,Action,Result","Situation,Task,Action,Result","Strength,Target,Achievement,Role","Strategy,Task,Approach,Resolution"],"correct_answer":"Situation,Task,Action,Result","cat":"HR","diff":"Easy","tip":"STAR is a structured approach to behavioral interview answers.","topic":"Interview Technique"},
+        {"q":"Best approach when asked 'Why do you want to work here'?","options":["Talk about the high salary","Say you need a job","Research and align your goals with their mission","Mention no other offers"],"correct_answer":"Research and align your goals with their mission","cat":"HR","diff":"Easy","tip":"Show genuine interest in the company's mission and culture.","topic":"Interview Preparation"},
+        {"q":"When answering 'Tell me about yourself', you should:","options":["Narrate entire life story","Give a 2-3 min professional summary relevant to the role","Only mention hobbies","Read from your resume"],"correct_answer":"Give a 2-3 min professional summary relevant to the role","cat":"HR","diff":"Easy","tip":"Past → Present → Future. Keep it concise and relevant.","topic":"Self Introduction"},
+        {"q":"How to handle a question you don't know in an interview?","options":["Make up an answer","Stay silent","Acknowledge uncertainty, explain thought process, commit to learning","Ask interviewer to skip"],"correct_answer":"Acknowledge uncertainty, explain thought process, commit to learning","cat":"HR","diff":"Medium","tip":"Honesty + structured thinking is valued over bluffing.","topic":"Interview Strategy"},
     ]
 
     company_pool = [
-        {"q": f"How has {company_name}'s work influenced the industry?",               "cat": "Company Specific", "diff": "Medium", "tip": "Research flagship products and recent news."},
-        {"q": f"What would your first 30-60-90 day plan look like at {company_name}?", "cat": "Company Specific", "diff": "Medium", "tip": "Show initiative: learn, connect, and contribute."},
-        {"q": f"What do you know about {company_name}'s core products or services?",   "cat": "Company Specific", "diff": "Easy",   "tip": "Check their website, LinkedIn, and news articles."},
-        {"q": f"How does this role at {company_name} align with your career goals?",   "cat": "Company Specific", "diff": "Easy",   "tip": "Connect your personal growth with the company vision."},
-        {"q": f"What challenges do you think {company_name} is currently facing?",     "cat": "Company Specific", "diff": "Hard",   "tip": "Show industry awareness and analytical thinking."},
+        {"q":f"What is {company_name} primarily known for?","options":["Healthcare products","IT and software solutions","Agricultural commodities","Aerospace manufacturing"],"correct_answer":"IT and software solutions","cat":"Company Specific","diff":"Easy","tip":f"Research {company_name}'s products before the interview.","topic":"Company Knowledge"},
+        {"q":"What does a 30-60-90 day plan mean when joining a company?","options":["A salary timeline","A structured plan for your first 30, 60, 90 days","A probation policy","A performance review schedule"],"correct_answer":"A structured plan for your first 30, 60, 90 days","cat":"Company Specific","diff":"Medium","tip":"A 30-60-90 plan shows initiative and preparation.","topic":"Career Planning"},
     ]
 
-    skill_templates = [
-        ("Describe your hands-on experience with {skill}. What have you built with it?", "Medium", "Be specific. Mention version, scale, and problems solved."),
-        ("What are the main advantages of {skill} over similar alternatives?",            "Easy",   "Show depth — not just surface-level awareness."),
-        ("Describe a challenging problem you solved using {skill}.",                       "Hard",   "Use STAR format. Focus on your contribution."),
-        ("How would you optimise performance in a {skill} application?",                   "Hard",   "Think about caching, batching, profiling."),
-        ("What are common pitfalls when working with {skill}?",                            "Medium", "Shows real-world experience beyond tutorials."),
+    skill_map = {
+        "Python": {"q":"Which of the following is NOT a built-in Python data type?","options":["list","dict","array","tuple"],"correct_answer":"array","cat":"Technical","diff":"Easy","tip":"Python has list, dict, set, tuple. 'array' requires import.","topic":"Python"},
+        "Java": {"q":"Which Java keyword prevents class inheritance?","options":["static","private","final","abstract"],"correct_answer":"final","cat":"Technical","diff":"Medium","tip":"'final' classes cannot be extended.","topic":"Java"},
+        "SQL": {"q":"Which SQL command retrieves data from a table?","options":["INSERT","UPDATE","SELECT","DELETE"],"correct_answer":"SELECT","cat":"Technical","diff":"Easy","tip":"SELECT is the DML command for reading data.","topic":"SQL"},
+        "JavaScript": {"q":"What does '===' check in JavaScript?","options":["Value only","Type only","Both value and type","Neither"],"correct_answer":"Both value and type","cat":"Technical","diff":"Easy","tip":"=== is strict equality — checks both value AND type.","topic":"JavaScript"},
+        "React": {"q":"What is a React component?","options":["A database model","A reusable UI piece that returns JSX","A backend service","An HTTP handler"],"correct_answer":"A reusable UI piece that returns JSX","cat":"Technical","diff":"Easy","tip":"React components are the building blocks of the UI.","topic":"React"},
+        "Git": {"q":"Which Git command creates a new branch?","options":["git merge","git branch <name>","git checkout master","git clone"],"correct_answer":"git branch <name>","cat":"Technical","diff":"Easy","tip":"'git branch <name>' creates; 'git checkout -b <name>' creates and switches.","topic":"Git"},
+        "Docker": {"q":"What is a Docker image?","options":["A running container","A snapshot/template to create containers","A volume for persistent data","A network interface"],"correct_answer":"A snapshot/template to create containers","cat":"Technical","diff":"Medium","tip":"Images are read-only templates; containers are running instances.","topic":"Docker"},
+        "AWS": {"q":"What does S3 stand for in AWS?","options":["Simple Storage Service","Secure Server System","Scalable Storage Solution","Server-Side Service"],"correct_answer":"Simple Storage Service","cat":"Technical","diff":"Easy","tip":"Amazon S3 = Simple Storage Service, used for object storage.","topic":"AWS"},
+    }
+
+    skill_mcqs = [skill_map[s] for s in (company_skills or []) if s in skill_map]
+
+    def not_seen(q):
+        return q["q"].strip().lower() not in seen_questions
+
+    pools = [
+        [q for q in tech_pool    if not_seen(q)],
+        [q for q in aptitude_pool if not_seen(q)],
+        [q for q in logical_pool  if not_seen(q)],
+        [q for q in coding_pool   if not_seen(q)],
+        [q for q in hr_pool       if not_seen(q)],
+        [q for q in company_pool  if not_seen(q)],
+        [q for q in skill_mcqs    if not_seen(q)],
     ]
-    skill_pool = []
-    for skill in (company_skills or [])[:8]:
-        for tmpl, diff, tip in skill_templates:
-            skill_pool.append({"q": tmpl.format(skill=skill), "cat": "Technical", "diff": diff, "tip": tip})
+    for p in pools:
+        _rnd.shuffle(p)
+    tp, ap, lp, cp, hp, comp, skp = pools
 
-    def not_seen(q_dict):
-        return q_dict["q"].strip().lower() not in seen_questions
-
-    tech_pool    = [q for q in tech_pool    if not_seen(q)]
-    hr_pool      = [q for q in hr_pool      if not_seen(q)]
-    coding_pool  = [q for q in coding_pool  if not_seen(q)]
-    company_pool = [q for q in company_pool if not_seen(q)]
-    skill_pool   = [q for q in skill_pool   if not_seen(q)]
-
-    _rnd.shuffle(tech_pool)
-    _rnd.shuffle(hr_pool)
-    _rnd.shuffle(coding_pool)
-    _rnd.shuffle(company_pool)
-    _rnd.shuffle(skill_pool)
-
-    selected = tech_pool[:5] + skill_pool[:6] + hr_pool[:5] + coding_pool[:4] + company_pool[:2]
+    selected = tp[:7] + ap[:4] + lp[:3] + cp[:3] + hp[:2] + comp[:1] + skp[:2]
     _rnd.shuffle(selected)
 
     for i, q in enumerate(selected):
         q["id"] = i + 1
-        if "tip" not in q:
-            q["tip"] = "Be concise and clear. Use real examples wherever possible."
-            
+        q.setdefault("tip", "")
+        q.setdefault("options", [])
+        q.setdefault("correct_answer", "")
+        q.setdefault("topic", "")
+
     return {
-        "questions": selected,
-        "company": {"name": company_name},
-        "role": {"title": job_title},
-        "recommended_topics": []
+        "questions":          selected,
+        "company":            {"name": company_name},
+        "role":               {"title": job_title},
+        "recommended_topics": [],
     }
+
 
 
 
 # ---------------------------------------------------------------------------
 # ── RESUME CONTENT GENERATION ────────────────────────────────────────────────
-# ---------------------------------------------------------------------------
-
-def generate_resume_content(
-    job_title: str,
-    skills: list,
-    experience_years: int = 0,
-) -> dict:
-    """Generate AI resume content for a given role and skill set."""
-    from flask import current_app
-    from services.qwen_service import call_qwen, parse_qwen_json
+# ---------------------------------------------------------------------------ervice import call_qwen, parse_qwen_json
 
     skills_str = ", ".join(skills[:10]) if skills else "general technical skills"
     token = (current_app.config.get("QWEN_TOKEN") or current_app.config.get("HF_TOKEN") or "").strip()

@@ -139,3 +139,44 @@ def api_search_post():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
+
+@company_bp.route('/company/add', methods=['POST'])
+@login_required
+def add_company():
+    name = request.form.get('name', '').strip()
+    industry = request.form.get('industry', '').strip()
+    location = request.form.get('location', '').strip()
+    website = request.form.get('website', '').strip()
+    description = request.form.get('description', '').strip()
+    
+    if not name:
+        flash('Company name is required.', 'danger')
+        return redirect(url_for('company.index'))
+        
+    import re
+    from database.db import execute_db, query_db
+    
+    # Generate slug
+    slug_base = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+    slug = slug_base
+    counter = 1
+    while query_db('SELECT id FROM companies WHERE slug=%s', (slug,), one=True):
+        slug = f'{slug_base}-{counter}'
+        counter += 1
+        
+    try:
+        new_id = execute_db(
+            '''INSERT INTO companies 
+               (name, slug, industry, location, website, description, company_type) 
+               VALUES (%s, %s, %s, %s, %s, %s, 'Startup')''',
+            (name, slug, industry, location, website, description),
+            get_id=True
+        )
+        log_activity(session['user_id'], 'company_add', f'Added startup company: {name}')
+        flash(f'{name} added successfully! You can now generate its AI intelligence.', 'success')
+        return redirect(url_for('company.detail', slug=slug))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        flash(f'Error adding company: {str(e)[:150]}', 'danger')
+        return redirect(url_for('company.index'))

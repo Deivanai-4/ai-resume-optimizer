@@ -108,6 +108,34 @@
   --z-dropdown:150;
 }
 
+[data-theme="dark"] {
+  /* Dark Surfaces */
+  --bg:           #0F172A;
+  --surface:      #1E293B;
+  --surface-2:    #334155;
+  --surface-3:    #475569;
+  --glass:        rgba(30, 41, 59, 0.75);
+
+  /* Borders */
+  --border:       #334155;
+  --border-2:     #475569;
+
+  /* Text */
+  --text-1:       #F8FAFC;
+  --text-2:       #CBD5E1;
+  --text-3:       #94A3B8;
+  --text-inv:     #0F172A;
+
+  /* Adjust shadow visibility on dark background */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.4);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.5);
+  --shadow-card: 0 0 0 1px var(--border), var(--shadow-sm);
+}
+
 /* ── Reset & Base ──────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

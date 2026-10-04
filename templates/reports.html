@@ -110,12 +110,9 @@
                             ('Resume', 'bi-file-earmark-text-fill', 'Detailed resume feedback report'),
                             ('Skill', 'bi-code-slash', 'Skill gap analysis vs target companies'),
                         ] %}
-                        <div style="display:flex; flex-direction:column; gap:var(--space-2);">
+                        <div style="display:flex; flex-direction:column; gap:var(--space-2);" id="reportTypeContainer">
                             {% for type_id, icon, desc in types %}
-                            <label style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3); border:1.5px solid var(--border); border-radius:var(--radius-md); cursor:pointer; transition:all var(--transition-fast);"
-                                   onmouseover="this.style.borderColor='var(--primary-400)'"
-                                   onmouseout="this.style.borderColor=document.getElementById('rt_{{ type_id }}').checked?'var(--primary)':'var(--border)'"
-                                   onclick="highlightType(this, '{{ type_id }}')">
+                            <label class="report-type-label" style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3); border:1.5px solid var(--border); border-radius:var(--radius-md); cursor:pointer; transition:all var(--transition-fast);">
                                 <input type="radio" name="report_type" id="rt_{{ type_id }}" value="{{ type_id }}" style="margin:0;"
                                        {{ 'checked' if loop.first }}>
                                 <i class="bi {{ icon }}" style="color:var(--primary); font-size:1.1rem; flex-shrink:0;"></i>
@@ -161,17 +158,40 @@
 
 {% block scripts %}
 <script>
-function highlightType(label, typeId) {
-    document.querySelectorAll('[name="report_type"]').forEach(r => {
-        const lbl = r.closest('label');
-        if (lbl) lbl.style.borderColor = r.checked ? 'var(--primary)' : 'var(--border)';
+function updateReportTypeBorders() {
+    document.querySelectorAll('.report-type-label').forEach(label => {
+        const radio = label.querySelector('input[type="radio"]');
+        if (radio && radio.checked) {
+            label.style.borderColor = 'var(--primary)';
+        } else {
+            label.style.borderColor = 'var(--border)';
+        }
     });
-    label.style.borderColor = 'var(--primary)';
 }
+
 document.addEventListener('DOMContentLoaded', () => {
-    // Highlight first by default
-    const first = document.querySelector('[name="report_type"]:checked');
-    if (first) first.closest('label').style.borderColor = 'var(--primary)';
+    // Initial border state
+    updateReportTypeBorders();
+
+    // Listen for changes on any radio button inside the container
+    const container = document.getElementById('reportTypeContainer');
+    if (container) {
+        container.addEventListener('change', updateReportTypeBorders);
+        
+        // Add hover effects cleanly
+        container.querySelectorAll('.report-type-label').forEach(label => {
+            label.addEventListener('mouseenter', () => {
+                if (!label.querySelector('input[type="radio"]').checked) {
+                    label.style.borderColor = 'var(--primary-400)';
+                }
+            });
+            label.addEventListener('mouseleave', () => {
+                if (!label.querySelector('input[type="radio"]').checked) {
+                    label.style.borderColor = 'var(--border)';
+                }
+            });
+        });
+    }
 
     attachAIFormLoading('reportForm', [
         'Gathering your analysis data…',

@@ -73,12 +73,18 @@ def create_app(config_name="default"):
     # Current User
     @app.context_processor
     def inject_user():
+        from database.db import query_db
+        user_settings = None
+        if "user_id" in session:
+            user_settings = query_db('SELECT * FROM settings WHERE user_id=%s', (session['user_id'],), one=True)
+            
         return {
             "current_user_id": session.get("user_id"),
             "current_user_name": session.get("user_name"),
             "current_user_email": session.get("user_email"),
             "current_user_photo": None,
             "current_profile_completion": session.get("profile_completion", 0),
+            "current_user_settings": user_settings,
             "is_logged_in": "user_id" in session,
             "now": datetime.now(),
         }
