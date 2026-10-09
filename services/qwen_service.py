@@ -68,9 +68,16 @@ def _make_client(token: str, provider: str):
             "Run: pip install 'huggingface_hub>=0.21.0'"
         ) from exc
 
-    if not provider or provider.lower() in ('auto', 'none', 'default'):
-        return InferenceClient(token=token, timeout=120)
-    return InferenceClient(token=token, provider=provider, timeout=120)
+    kwargs = {"token": token, "timeout": 120}
+    if provider and provider.lower() not in ('auto', 'none', 'default'):
+        kwargs["provider"] = provider
+
+    try:
+        return InferenceClient(**kwargs)
+    except TypeError:
+        # Fallback if the installed version doesn't support 'provider'
+        kwargs.pop("provider", None)
+        return InferenceClient(**kwargs)
 
 
 def _strip_markdown_fences(text: str) -> str:

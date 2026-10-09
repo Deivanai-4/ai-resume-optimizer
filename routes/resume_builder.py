@@ -300,6 +300,7 @@ def change_template(gen_id):
 @login_required
 def download_pdf(gen_id):
     import io
+    from werkzeug.utils import secure_filename
     from services.resume_generation_service import render_pdf_bytes
 
     user_id = session['user_id']
@@ -336,7 +337,11 @@ def download_pdf(gen_id):
 
     logger.info(f"[PDF] PDF generation completed — {len(pdf_bytes)} bytes, User ID: {user_id}")
 
-    dl_name = f"{gen.get('label','resume').replace(' — ', '_').replace(' ', '_')}.pdf"
+    dl_name_raw = gen.get('label', 'resume').replace(' — ', '_').replace(' ', '_')
+    dl_name = secure_filename(dl_name_raw)
+    if not dl_name:
+        dl_name = "resume"
+    dl_name = f"{dl_name}.pdf"
     log_activity(user_id, 'resume_download_pdf', f'Downloaded PDF: {dl_name}')
 
     buf = io.BytesIO(pdf_bytes)
@@ -357,6 +362,7 @@ def download_pdf(gen_id):
 @login_required
 def download_docx(gen_id):
     import io
+    from werkzeug.utils import secure_filename
     from services.resume_generation_service import render_docx_bytes
 
     user_id = session['user_id']
@@ -390,7 +396,11 @@ def download_docx(gen_id):
 
     logger.info(f"[DOCX] Generation completed — {len(docx_bytes)} bytes, User ID: {user_id}")
 
-    dl_name = f"{gen.get('label','resume').replace(' — ', '_').replace(' ', '_')}.docx"
+    dl_name_raw = gen.get('label', 'resume').replace(' — ', '_').replace(' ', '_')
+    dl_name = secure_filename(dl_name_raw)
+    if not dl_name:
+        dl_name = "resume"
+    dl_name = f"{dl_name}.docx"
     log_activity(user_id, 'resume_download_docx', f'Downloaded DOCX: {dl_name}')
 
     buf = io.BytesIO(docx_bytes)

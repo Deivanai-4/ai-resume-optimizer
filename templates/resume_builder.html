@@ -54,8 +54,13 @@
 
     <!-- â”€â”€ MAIN FORM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
     <form action="{{ url_for('resume_builder.generate') }}" method="POST" id="builderForm">
-
-        <div style="display:grid; grid-template-columns:1fr 360px; gap:var(--space-5); align-items:start;">
+    <style>
+        @media (max-width: 992px) {
+            .builder-layout { grid-template-columns: 1fr !important; }
+            #flowChoice { grid-template-columns: 1fr !important; }
+        }
+    </style>
+        <div class="builder-layout" style="display:grid; grid-template-columns:1fr 360px; gap:var(--space-5); align-items:start;">
 
             <!-- â”€â”€ LEFT: TEMPLATE PICKER + WIZARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
             <div class="builder-main">
