@@ -16,6 +16,7 @@ Security rules:
 """
 import json
 import logging
+import os
 import re
 import time
 
@@ -29,7 +30,7 @@ def _get_config():
     """
     Pull Qwen connection settings from Flask app config.
     Supports both QWEN_* and HF_* env-var naming conventions.
-    Returns (token, model, provider) or raises RuntimeError.
+    Returns (token, model, provider, timeout).
     """
     from flask import current_app
 
@@ -52,10 +53,13 @@ def _get_config():
         or "together"
     ).strip()
 
-    return token, model, provider
+    # Timeout — read from app config (config.py already loaded it from env)
+    timeout = int(cfg.get("QWEN_TIMEOUT") or os.environ.get("QWEN_TIMEOUT", 90))
+
+    return token, model, provider, timeout
 
 
-def _make_client(token: str, provider: str):
+def _make_client(token: str, provider: str, timeout: int = 90):
     """
     Build an InferenceClient with an explicit provider.
     Explicit provider= bypasses the auto-router (which rejects non-hf_ tokens).
@@ -68,7 +72,7 @@ def _make_client(token: str, provider: str):
             "Run: pip install 'huggingface_hub>=0.21.0'"
         ) from exc
 
-    kwargs = {"token": token, "timeout": 120}
+    kwargs = {"token": token, "timeout": timeout}
     if provider and provider.lower() not in ('auto', 'none', 'default'):
         kwargs["provider"] = provider
 
@@ -156,8 +160,8 @@ def call_qwen(
         - Must be called within a Flask application context.
         - Token is never written to logs.
     """
-    token, model, provider = _get_config()
-    logger.debug(f"QWEN: _get_config() returned token={bool(token)} model={model} provider={provider}")
+    token, model, provider, timeout = _get_config()
+    logger.debug(f"QWEN: _get_config() returned token={bool(token)} model={model} provider={provider} timeout={timeout}s")
 
     if not token:
         logger.warning(
@@ -167,7 +171,7 @@ def call_qwen(
         return None
 
     try:
-        client = _make_client(token, provider)
+        client = _make_client(token, provider, timeout)
     except RuntimeError as exc:
         logger.error(f"QWEN: Client init failed — {exc}")
         return None
