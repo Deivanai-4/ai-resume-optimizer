@@ -94,6 +94,12 @@ Scoring guidelines (0-100):
 Be honest and realistic. Avoid inflating scores. A fresh graduate with no experience
 should NOT score above 60 on career_readiness_score.
 
+For missing_skills: List 4-8 specific technical skills that would significantly
+strengthen this candidate for modern software engineering roles but are NOT present
+or demonstrated in the resume. Examples: Docker, Kubernetes, CI/CD, Redis, System
+Design, AWS, GraphQL, TypeScript — pick whichever apply given the candidate's stack.
+NEVER return an empty missing_skills array.
+
 RESUME TEXT:
 \"\"\"
 {excerpt}
@@ -147,17 +153,18 @@ Return ONLY this JSON structure with every field populated:
 {_ANALYSIS_SCHEMA}"""
 
 
-def _validate_analysis_json(data: dict) -> dict:
+def _validate_analysis_json(data: dict, resume_text: str = "") -> dict:
     """
     Validate and normalise the JSON returned by Qwen.
     Ensures all fields expected by AnalysisModel.create() are present and typed.
+    If Qwen returned missing_skills=[], computes them from the resume text as fallback.
     """
     scores = data.get("scores", {})
 
     def _int(val, default=0):
         try:
             v = int(val)
-            return max(0, min(100, v))       # clamp to [0, 100]
+            return max(0, min(100, v))
         except (TypeError, ValueError):
             return default
 
@@ -166,8 +173,7 @@ def _validate_analysis_json(data: dict) -> dict:
             return [str(x) for x in val if x]
         return []
 
-    return {
-        # ── Scores ──────────────────────────────────────────────────────────
+    result = {
         "ats_score":                _int(scores.get("ats_score",                data.get("ats_score",                0))),
         "skill_match_score":        _int(scores.get("skill_match_score",        data.get("skill_match_score",        0))),
         "tech_match_score":         _int(scores.get("tech_match_score",         data.get("tech_match_score",         0))),
@@ -177,16 +183,12 @@ def _validate_analysis_json(data: dict) -> dict:
         "grammar_score":            _int(scores.get("grammar_score",            data.get("grammar_score",            0))),
         "formatting_score":         _int(scores.get("formatting_score",         data.get("formatting_score",         0))),
         "overall_score":            _int(scores.get("overall_score",            data.get("overall_score",            0))),
-
-        # ── Text / arrays ────────────────────────────────────────────────────
         "summary":          str(data.get("summary", "")),
         "strengths":        _list(data.get("strengths")),
         "weaknesses":       _list(data.get("weaknesses")),
         "missing_skills":   _list(data.get("missing_skills")),
         "suggestions":      _list(data.get("resume_suggestions")),
         "keywords":         _list(data.get("keywords")),
-
-        # ── Extra fields (stored in analysis_data JSON blob) ─────────────────
         "skills":                   _list(data.get("skills")),
         "programming_languages":    _list(data.get("programming_languages")),
         "frameworks":               _list(data.get("frameworks")),
@@ -201,14 +203,35 @@ def _validate_analysis_json(data: dict) -> dict:
         "achievements":             _list(data.get("achievements")),
         "grammar_observations":     _list(data.get("grammar_observations")),
         "formatting_observations":  _list(data.get("formatting_observations")),
-
-        # ── Compatibility fields expected by existing routes ─────────────────
         "matched_skills":       [],
         "all_resume_skills":    _list(data.get("skills")),
-
-        # ── Source flag ──────────────────────────────────────────────────────
         "ai_source": "qwen",
     }
+
+    # If Qwen returned no missing_skills, compute from resume text vs benchmark
+    if not result["missing_skills"]:
+        try:
+            from services.resume_parser import extract_skills_from_text
+            resume_skills = {s["name"].lower() for s in extract_skills_from_text(resume_text or "")}
+            qwen_skills   = {s.lower() for s in result["skills"]}
+            candidate     = resume_skills | qwen_skills
+            benchmark = [
+                'Docker', 'Kubernetes', 'CI/CD', 'Redis', 'AWS', 'System Design',
+                'GraphQL', 'TypeScript', 'Microservices', 'Unit Testing',
+                'PostgreSQL', 'Linux', 'Terraform', 'REST APIs', 'Git'
+            ]
+            computed = [s for s in benchmark if s.lower() not in candidate][:8]
+            result["missing_skills"] = computed or [
+                'Docker', 'CI/CD', 'System Design', 'AWS', 'Unit Testing', 'Redis'
+            ]
+            logger.info(f"Missing skills fallback computed {len(result['missing_skills'])} skills")
+        except Exception as exc:
+            logger.warning(f"Missing skills fallback error: {exc}")
+            result["missing_skills"] = ['Docker', 'CI/CD', 'System Design', 'AWS', 'Unit Testing', 'Redis']
+
+    return result
+
+
 
 
 def analyze_resume(
@@ -248,7 +271,7 @@ def analyze_resume(
             data = parse_qwen_json(raw)
             if data:
                 try:
-                    validated = _validate_analysis_json(data)
+                    validated = _validate_analysis_json(data, resume_text)
                     # Sanity check: at least one score must be non-zero
                     if any(
                         validated.get(k, 0) > 0
