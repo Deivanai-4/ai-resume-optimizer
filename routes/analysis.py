@@ -34,6 +34,39 @@ def index():
             selected_analysis['strengths_list'] = parse_json_field(selected_analysis.get('strengths'))
             selected_analysis['weaknesses_list'] = parse_json_field(selected_analysis.get('weaknesses'))
             selected_analysis['missing_skills_list'] = parse_json_field(selected_analysis.get('missing_skills'))
+            if not selected_analysis['missing_skills_list']:
+                from services.resume_parser import extract_skills_from_text
+                from database.db import execute_db
+                res = ResumeModel.get_by_id(selected_analysis['resume_id'], user_id) if selected_analysis.get('resume_id') else None
+                res_text = res.get('extracted_text', '') if res else ''
+                resume_skills = [s['name'].lower() for s in extract_skills_from_text(res_text)]
+                u_skills = [s['skill_name'].lower() for s in ProfileModel.get_skills(user_id)]
+                candidate_skills = set(resume_skills + u_skills)
+                
+                title_lower = (selected_analysis.get('job_title') or 'Software Engineer').lower()
+                role_defaults = {
+                    'frontend': ['TypeScript', 'Next.js', 'Redux', 'Jest', 'GraphQL', 'Tailwind CSS'],
+                    'backend': ['Docker', 'Redis', 'Microservices', 'PostgreSQL', 'CI/CD', 'AWS'],
+                    'fullstack': ['Docker', 'AWS', 'TypeScript', 'CI/CD', 'GraphQL', 'Microservices'],
+                    'data': ['Pandas', 'Power BI', 'SQL', 'Tableau', 'BigQuery', 'Machine Learning'],
+                    'ml': ['PyTorch', 'TensorFlow', 'NLP', 'Deep Learning', 'Scikit-learn', 'MLOps'],
+                    'testing': ['Selenium', 'Automation Testing', 'Postman', 'PyTest', 'Cypress', 'Jira'],
+                    'qa': ['Selenium', 'Automation Testing', 'Postman', 'API Testing', 'PyTest', 'Jira'],
+                    'software': ['Docker', 'System Design', 'CI/CD', 'AWS', 'Kubernetes', 'Unit Testing', 'Redis']
+                }
+                domain = 'software'
+                for k in role_defaults:
+                    if k in title_lower:
+                        domain = k
+                        break
+                missing_derived = [s for s in role_defaults[domain] if s.lower() not in candidate_skills]
+                if not missing_derived:
+                    missing_derived = ['Docker', 'System Design', 'CI/CD', 'AWS', 'Kubernetes', 'Unit Testing']
+                selected_analysis['missing_skills_list'] = missing_derived[:8]
+                try:
+                    execute_db('UPDATE resume_analysis SET missing_skills=%s WHERE id=%s', (json.dumps(selected_analysis['missing_skills_list']), selected_analysis['id']))
+                except Exception:
+                    pass
             selected_analysis['suggestions_list'] = parse_json_field(selected_analysis.get('resume_suggestions'))
             selected_analysis['keywords_list'] = parse_json_field(selected_analysis.get('keyword_analysis'))
             # Populate company_name: try company join first, then manual from ai_data

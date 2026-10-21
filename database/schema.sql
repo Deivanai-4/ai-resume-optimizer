@@ -295,23 +295,41 @@ CREATE TABLE IF NOT EXISTS roadmap_items (
 ) ENGINE=InnoDB;
 
 -- ============================================================
--- 16. INTERVIEW QUESTIONS TABLE
+-- 16. INTERVIEW SESSIONS TABLE
+-- ============================================================
+CREATE TABLE IF NOT EXISTS interview_sessions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    company_id INT NULL,
+    resume_id INT NULL,
+    session_metadata LONGTEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- 17. INTERVIEW QUESTIONS TABLE
 -- ============================================================
 CREATE TABLE IF NOT EXISTS interview_questions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     company_id INT NULL,
     resume_id INT NULL,
+    session_id INT NULL,
     question TEXT NOT NULL,
     answer TEXT NULL,
-    category ENUM('Technical', 'HR', 'Coding', 'Aptitude', 'Company Specific') DEFAULT 'Technical',
+    category VARCHAR(50) DEFAULT 'Technical',
     difficulty ENUM('Easy', 'Medium', 'Hard') DEFAULT 'Medium',
     ai_tip TEXT NULL,
+    options TEXT NULL,
+    correct_answer VARCHAR(255) NULL,
     user_answer TEXT NULL,
     score INT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL
+    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL,
+    FOREIGN KEY (session_id) REFERENCES interview_sessions(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ============================================================

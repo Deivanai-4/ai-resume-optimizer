@@ -37,3 +37,6 @@ logs/
 # Reports / generated files
 *.pdf
 *.tmp
+
+# Vercel
+.vercel/

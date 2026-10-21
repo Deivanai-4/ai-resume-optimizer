@@ -53,22 +53,38 @@ def upload():
         flash('File too large. Maximum size is 5MB.', 'danger')
         return redirect(url_for('resumes.index'))
     
-    resumes_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'resumes', str(user_id))
-    os.makedirs(resumes_dir, exist_ok=True)
-    
     original_name = file.filename
     file_type = original_name.rsplit('.', 1)[1].lower()
     filename = generate_unique_filename(original_name)
-    file_path = os.path.join(resumes_dir, filename)
-    file.save(file_path)
-    
-    resume_id = ResumeModel.create(
-        user_id, filename, original_name, file_path, file_size, file_type
+
+    from services.storage_service import (
+        get_temp_dir, upload_resume_file, get_private_download_url,
+        is_cloudinary_id, delete_stored_file, fetch_resume_for_processing
     )
-    
-    # Parse immediately
+
+    # Save to writable temp directory first for parsing
+    temp_dir = get_temp_dir()
+    temp_path = os.path.join(temp_dir, filename)
+    file.save(temp_path)
+
+    # Upload to persistent storage (Cloudinary private raw asset or local folder)
     try:
-        parsed = parse_resume(file_path, file_type)
+        stored_path = upload_resume_file(temp_path, user_id, original_name)
+    except Exception as e:
+        current_app.logger.error(f"Failed to upload resume to persistent storage: {e}")
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        if is_ajax: return jsonify({'success': False, 'message': 'Storage error. Please try again.'})
+        flash('Storage error while saving resume. Please check configuration.', 'danger')
+        return redirect(url_for('resumes.index'))
+
+    resume_id = ResumeModel.create(
+        user_id, filename, original_name, stored_path, file_size, file_type
+    )
+
+    # Parse resume text and skills from the local temp file
+    try:
+        parsed = parse_resume(temp_path, file_type)
         skill_names = [s['name'] for s in parsed['skills']]
         ResumeModel.update_parsed_data(resume_id, parsed['text'], skill_names)
         
@@ -89,6 +105,13 @@ def upload():
         if is_ajax:
             return jsonify({'success': True, 'message': 'Resume uploaded successfully! (Parsing failed — you can retry later)'})
         flash('Resume uploaded successfully! (Parsing failed — you can retry later)', 'warning')
+    finally:
+        # Clean up temp file if stored in cloud
+        if is_cloudinary_id(stored_path) and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
     
     return redirect(url_for('resumes.index'))
 
@@ -102,12 +125,9 @@ def delete(resume_id):
     if not resume:
         return jsonify({'success': False, 'message': 'Resume not found'}), 404
     
-    # Delete file
-    try:
-        if os.path.exists(resume['file_path']):
-            os.remove(resume['file_path'])
-    except Exception:
-        pass
+    # Delete file from Cloudinary or local disk
+    from services.storage_service import delete_stored_file
+    delete_stored_file(resume['file_path'], resource_type='raw', is_private=True)
     
     ResumeModel.delete(resume_id, user_id)
     log_activity(user_id, 'resume_delete', f'Deleted resume: {resume["original_name"]}')
@@ -127,14 +147,26 @@ def download(resume_id):
     if not resume:
         flash('Resume not found.', 'danger')
         return redirect(url_for('resumes.index'))
-    
-    if not os.path.exists(resume['file_path']):
-        flash('Resume file not found on server.', 'danger')
+
+    from services.storage_service import is_cloudinary_id, get_private_download_url
+    path = resume['file_path']
+
+    if is_cloudinary_id(path):
+        try:
+            url = get_private_download_url(path, resume['file_type'])
+            return redirect(url)
+        except Exception as e:
+            current_app.logger.error(f"Failed to generate download URL: {e}")
+            flash('Error generating secure download link.', 'danger')
+            return redirect(url_for('resumes.index'))
+    else:
+        # Local file fallback
+        if os.path.exists(path):
+            return send_file(path, 
+                             download_name=resume['original_name'],
+                             as_attachment=True)
+        flash('This resume was stored on a previous server and is no longer available for download.', 'warning')
         return redirect(url_for('resumes.index'))
-    
-    return send_file(resume['file_path'], 
-                     download_name=resume['original_name'],
-                     as_attachment=True)
 
 
 @resumes_bp.route('/resumes/<int:resume_id>/parse', methods=['POST'])
@@ -145,14 +177,25 @@ def parse(resume_id):
     if not resume:
         flash('Resume not found.', 'danger')
         return redirect(url_for('resumes.index'))
+    
+    from services.storage_service import fetch_resume_for_processing
+    local_path = None
+    is_temp = False
     try:
-        parsed = parse_resume(resume['file_path'], resume['file_type'])
+        local_path, is_temp = fetch_resume_for_processing(resume['file_path'], resume['file_type'])
+        parsed = parse_resume(local_path, resume['file_type'])
         skill_names = [s['name'] for s in parsed['skills']]
         ResumeModel.update_parsed_data(resume_id, parsed['text'], skill_names)
         flash(f'Resume re-parsed! {len(skill_names)} skills found.', 'success')
     except Exception as e:
         current_app.logger.error(f"Re-parse error: {e}")
         flash('Re-parse failed. File may be missing or corrupt.', 'danger')
+    finally:
+        if is_temp and local_path and os.path.exists(local_path):
+            try:
+                os.remove(local_path)
+            except OSError:
+                pass
     return redirect(url_for('resumes.index'))
 
 

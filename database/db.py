@@ -2,6 +2,7 @@
 Database connection helper using mysql-connector-python.
 Provides a get_db() function that returns a connection from the pool.
 """
+import certifi
 import mysql.connector
 from mysql.connector import pooling
 from flask import current_app, g
@@ -11,6 +12,16 @@ def get_db():
     """Get a database connection from the app context."""
     if 'db' not in g:
         cfg = current_app.config
+        ssl_args = {}
+        db_host = cfg.get('DB_HOST', '')
+        # Apply SSL for remote hosts (e.g. TiDB Serverless) or when explicitly configured
+        if cfg.get('DB_SSL_CA') or (db_host and db_host not in ('localhost', '127.0.0.1')):
+            ssl_ca = cfg.get('DB_SSL_CA') or certifi.where()
+            ssl_args = {
+                'ssl_ca': ssl_ca,
+                'ssl_verify_cert': True,
+                'ssl_verify_identity': True,
+            }
         try:
             g.db = mysql.connector.connect(
                 host=cfg['DB_HOST'],
@@ -19,7 +30,8 @@ def get_db():
                 password=cfg['DB_PASSWORD'],
                 database=cfg['DB_NAME'],
                 charset='utf8mb4',
-                autocommit=False
+                autocommit=False,
+                **ssl_args
             )
         except mysql.connector.Error as err:
             current_app.logger.error(f"Database connection error: {err}")

@@ -90,17 +90,15 @@ def upload_photo():
         flash('Invalid file type. Please upload PNG, JPG, or JPEG.', 'danger')
         return redirect(url_for('profile.index'))
     
-    photos_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'photos')
-    os.makedirs(photos_dir, exist_ok=True)
-    
-    filename = generate_unique_filename(file.filename)
-    file_path = os.path.join(photos_dir, filename)
-    file.save(file_path)
-    
-    relative_path = f'photos/{filename}'
-    ProfileModel.update_photo(user_id, relative_path)
-    log_activity(user_id, 'photo_upload', 'Uploaded profile photo')
-    flash('Profile photo updated successfully!', 'success')
+    from services.storage_service import upload_profile_photo
+    try:
+        stored_path = upload_profile_photo(file, user_id)
+        ProfileModel.update_photo(user_id, stored_path)
+        log_activity(user_id, 'photo_upload', 'Uploaded profile photo')
+        flash('Profile photo updated successfully!', 'success')
+    except Exception as e:
+        current_app.logger.error(f"Profile photo upload error: {e}")
+        flash('Error saving profile photo. Please try again.', 'danger')
     return redirect(url_for('profile.index'))
 
 
@@ -291,9 +289,8 @@ def upload_extract():
         return jsonify({'success': False, 'message': 'Invalid file type. Please upload PDF or DOCX'}), 400
 
     # Save temp file
-    from flask import current_app
-    temp_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp')
-    os.makedirs(temp_dir, exist_ok=True)
+    from services.storage_service import get_temp_dir
+    temp_dir = get_temp_dir()
     temp_path = os.path.join(temp_dir, f"{uuid.uuid4().hex}_{file.filename}")
     file.save(temp_path)
 
@@ -560,8 +557,8 @@ def api_extract_resume():
         if ext not in ['pdf', 'doc', 'docx']:
             return jsonify({'success': False, 'message': 'Invalid file type. Please upload PDF or DOCX'}), 400
             
-        temp_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp')
-        os.makedirs(temp_dir, exist_ok=True)
+        from services.storage_service import get_temp_dir
+        temp_dir = get_temp_dir()
         temp_path = os.path.join(temp_dir, f"{uuid.uuid4().hex}_{file.filename}")
         file.save(temp_path)
         
@@ -658,6 +655,8 @@ def save_imported_data():
         # Experience
         existing_exp = ProfileModel.get_experience(user_id) or []
         for exp in data.get('experience', []):
+            if isinstance(exp, str):
+                continue
             if exp.get('company_name') or exp.get('job_title'):
                 if not any(e['company_name'] == exp.get('company_name') and e['job_title'] == exp.get('job_title') for e in existing_exp):
                     end_date = exp.get('end_date', '')
@@ -668,6 +667,8 @@ def save_imported_data():
         # Education
         existing_edu = ProfileModel.get_education(user_id) or []
         for edu in data.get('education', []):
+            if isinstance(edu, str):
+                continue
             if edu.get('institution') or edu.get('degree'):
                 if not any(e['institution'] == edu.get('institution') and e['degree'] == edu.get('degree') for e in existing_edu):
                     ProfileModel.add_education(user_id, edu)
@@ -675,6 +676,8 @@ def save_imported_data():
         # Projects
         existing_proj = ProfileModel.get_projects(user_id) or []
         for proj in data.get('projects', []):
+            if isinstance(proj, str):
+                proj = {'title': proj}
             if proj.get('title'):
                 if not any(p['title'] == proj.get('title') for p in existing_proj):
                     ProfileModel.add_project(user_id, proj)
@@ -682,6 +685,8 @@ def save_imported_data():
         # Certifications
         existing_cert = ProfileModel.get_certifications(user_id) or []
         for cert in data.get('certifications', []):
+            if isinstance(cert, str):
+                cert = {'cert_name': cert}
             if cert.get('cert_name'):
                 if not any(c['cert_name'] == cert.get('cert_name') for c in existing_cert):
                     ProfileModel.add_certification(user_id, cert)
@@ -689,6 +694,8 @@ def save_imported_data():
         # Skills
         existing_skills = ProfileModel.get_skills(user_id) or []
         for skill in data.get('skills', []):
+            if isinstance(skill, str):
+                skill = {'skill_name': skill, 'category': 'Other'}
             if skill.get('skill_name'):
                 if not any(s['skill_name'].lower() == skill.get('skill_name').lower() for s in existing_skills):
                     ProfileModel.add_skill(

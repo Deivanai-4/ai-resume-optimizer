@@ -36,8 +36,16 @@ resume_builder_bp = Blueprint('resume_builder', __name__)
 
 def _gen_dir(user_id):
     """Return (and create) the generated-resumes directory for this user."""
-    base = os.path.join(current_app.config['UPLOAD_FOLDER'], 'generated', str(user_id))
-    os.makedirs(base, exist_ok=True)
+    from services.storage_service import get_temp_dir
+    upload_base = current_app.config.get('UPLOAD_FOLDER') or get_temp_dir()
+    if upload_base.startswith('/var/task'):
+        upload_base = get_temp_dir()
+    base = os.path.join(upload_base, 'generated', str(user_id))
+    try:
+        os.makedirs(base, exist_ok=True)
+    except OSError:
+        base = os.path.join(get_temp_dir(), 'generated', str(user_id))
+        os.makedirs(base, exist_ok=True)
     return base
 
 

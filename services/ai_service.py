@@ -299,7 +299,31 @@ def _smart_stub_analysis(
     company_lower = [s.lower() for s in (company_skills or [])]
     matched       = [s for s in company_lower if s in all_candidate]
     skill_match   = int(len(matched) / max(len(company_lower), 1) * 100) if company_lower else min(60, len(all_candidate) * 5)
-    missing       = [s for s in (company_skills or []) if s.lower() not in all_candidate][:8]
+    missing = [s for s in (company_skills or []) if s.lower() not in all_candidate][:8]
+    if not missing:
+        role_skill_standards = {
+            'frontend': ['React', 'TypeScript', 'Tailwind CSS', 'Next.js', 'Redux', 'REST APIs', 'Jest', 'Webpack'],
+            'backend': ['Python', 'Docker', 'PostgreSQL', 'Redis', 'REST APIs', 'Microservices', 'CI/CD', 'AWS'],
+            'fullstack': ['Docker', 'AWS', 'TypeScript', 'PostgreSQL', 'CI/CD', 'GraphQL', 'Redis', 'Microservices'],
+            'data': ['Python', 'SQL', 'Pandas', 'Power BI', 'Machine Learning', 'NumPy', 'Tableau', 'BigQuery'],
+            'ml': ['Python', 'PyTorch', 'TensorFlow', 'Scikit-learn', 'NLP', 'Computer Vision', 'Deep Learning', 'MLOps'],
+            'ai': ['Python', 'PyTorch', 'Transformers', 'LangChain', 'FastAPI', 'Vector Databases', 'OpenAI API'],
+            'devops': ['Docker', 'Kubernetes', 'CI/CD', 'AWS', 'Terraform', 'Linux', 'Ansible', 'Prometheus'],
+            'cloud': ['AWS', 'Docker', 'Kubernetes', 'Terraform', 'CI/CD', 'Linux', 'Azure', 'Microservices'],
+            'testing': ['Selenium', 'PyTest', 'Postman', 'Jira', 'Automation Testing', 'CI/CD', 'Cypress', 'SQL'],
+            'qa': ['Manual Testing', 'Selenium', 'Postman', 'Test Automation', 'Jira', 'PyTest', 'SQL', 'API Testing'],
+            'software': ['Docker', 'System Design', 'CI/CD', 'AWS', 'Kubernetes', 'Unit Testing', 'Redis', 'Data Structures']
+        }
+        title_lower = (job_title or '').lower()
+        matched_target = 'software'
+        for k in role_skill_standards:
+            if k in title_lower:
+                matched_target = k
+                break
+        benchmark = role_skill_standards[matched_target]
+        missing = [s for s in benchmark if s.lower() not in all_candidate][:8]
+        if not missing:
+            missing = ['Docker', 'System Design', 'CI/CD', 'AWS', 'Kubernetes', 'Unit Testing']
 
     word_count    = len((resume_text or "").split())
     has_sections  = all(kw in (resume_text or "").lower() for kw in ["experience", "education", "skill"])
@@ -456,8 +480,12 @@ def optimize_resume(resume_text: str, company_skills: list, job_title: str, comp
 
         exp_kws = ['intern', 'engineer', 'developer', 'analyst', 'manager', 'lead', 'architect', 'consultant', 'trainee']
         exp_lines = [l for l in lines if any(k in l.lower() for k in exp_kws) and 5 <= len(l) <= 120]
+        def _clean_bullet(line):
+            cleaned = re.sub(r'^[•\-\*●·\s]+', '', line).strip()
+            return f"• {cleaned}" if cleaned else ""
+
         exp_bullets = '\n'.join(
-            f"• {l}" if not l.startswith('•') else l for l in exp_lines[:6]
+            _clean_bullet(l) for l in exp_lines[:6] if _clean_bullet(l)
         ) or (
             f"• Developed software solutions using {', '.join(all_skills[:3])}\n"
             f"• Collaborated with cross-functional teams to deliver features on time\n"
@@ -470,17 +498,20 @@ def optimize_resume(resume_text: str, company_skills: list, job_title: str, comp
 
         proj_kws = ['project', 'built', 'developed', 'created', 'implemented']
         proj_lines = [l for l in lines if any(k in l.lower() for k in proj_kws) and len(l) > 20]
-        proj_text = '\n'.join(f"• {l}" for l in proj_lines[:4]) if proj_lines else f"• Built a {job_title.lower()} application using {', '.join(all_skills[:3])}"
+        proj_text = '\n'.join(
+            _clean_bullet(l) for l in proj_lines[:4] if _clean_bullet(l)
+        ) if proj_lines else f"• Built a {job_title.lower()} application using {', '.join(all_skills[:3])}"
 
-        header = f"{name}\n{email}  |  {phone}\n{'─'*50}\n\n" if name else ""
+        sep = "─" * 32
+        header = f"{name}\n{email}  |  {phone}\n{sep}\n\n" if name else ""
         ai_resume = (
             f"{header}"
-            f"PROFESSIONAL SUMMARY\n{'─'*40}\n{summary}\n\n"
-            f"SKILLS\n{'─'*40}\n{skills_line}\n\n"
-            f"WORK EXPERIENCE\n{'─'*40}\n{exp_bullets}\n\n"
-            f"EDUCATION\n{'─'*40}\n{edu_text}\n\n"
-            f"PROJECTS\n{'─'*40}\n{proj_text}\n\n"
-            f"CERTIFICATIONS\n{'─'*40}\nAdd your certifications here"
+            f"PROFESSIONAL SUMMARY\n{sep}\n{summary}\n\n"
+            f"SKILLS\n{sep}\n{skills_line}\n\n"
+            f"WORK EXPERIENCE\n{sep}\n{exp_bullets}\n\n"
+            f"EDUCATION\n{sep}\n{edu_text}\n\n"
+            f"PROJECTS\n{sep}\n{proj_text}\n\n"
+            f"CERTIFICATIONS\n{sep}\nAdd your certifications here"
         )
 
     # Extract summary from full resume text

@@ -8,30 +8,30 @@
 <div class="stagger-children">
 
 <!-- ── ACTION BAR ─────────────────────────────────────────── -->
-<div class="resume-action-bar" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-3); margin-bottom:var(--space-5); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:var(--space-4) var(--space-5); position:relative; z-index:100;" class="fade-in-up">
-    <div style="display:flex; align-items:center; gap:var(--space-4);">
-        <a href="{{ url_for('resume_builder.create') }}" class="btn btn-ghost btn-sm">
+<div class="resume-action-bar fade-in-up" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-3); margin-bottom:var(--space-5); background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:var(--space-4) var(--space-5); position:relative; z-index:100;">
+    <div class="resume-action-bar-top" style="display:flex; align-items:center; gap:var(--space-4);">
+        <a href="{{ url_for('resume_builder.create') }}" class="btn btn-ghost btn-sm btn-back">
             <i class="bi bi-arrow-left"></i> Back
         </a>
-        <div>
-            <div style="font-size:var(--text-base); font-weight:700;">{{ gen.label }}</div>
-            <div style="font-size:var(--text-xs); color:var(--text-3);">
+        <div class="resume-action-bar-title-block">
+            <div class="resume-action-bar-title" style="font-size:var(--text-base); font-weight:700;">{{ gen.label }}</div>
+            <div class="resume-action-bar-sub" style="font-size:var(--text-xs); color:var(--text-3);">
                 {{ gen.job_role }}{% if gen.company_name %} at {{ gen.company_name }}{% endif %} &bull;
                 {{ gen.created_at.strftime('%d %b %Y') if gen.created_at else '' }}
             </div>
         </div>
     </div>
 
-    <div style="display:flex; align-items:center; gap:var(--space-3);">
+    <div class="resume-action-bar-buttons" style="display:flex; align-items:center; gap:var(--space-3);">
         <!-- ATS Score -->
-        <div style="display:flex; align-items:center; gap:var(--space-2); padding:var(--space-2) var(--space-4); background:{{ 'var(--success-100)' if gen.ats_score >= 70 else 'var(--warning-100)' }}; border-radius:var(--radius-full);">
+        <div class="resume-ats-pill" style="display:flex; align-items:center; gap:var(--space-2); padding:var(--space-2) var(--space-4); background:{{ 'var(--success-100)' if gen.ats_score >= 70 else 'var(--warning-100)' }}; border-radius:var(--radius-full);">
             <i class="bi bi-robot" style="color:{{ 'var(--success)' if gen.ats_score >= 70 else 'var(--warning)' }};"></i>
             <span style="font-size:var(--text-sm); font-weight:700; color:{{ 'var(--success)' if gen.ats_score >= 70 else 'var(--warning)' }};">ATS: {{ gen.ats_score }}%</span>
         </div>
 
         <!-- Change Template -->
-        <div class="dropdown">
-            <button class="btn btn-secondary btn-sm" type="button" data-bs-toggle="dropdown">
+        <div class="dropdown resume-template-dropdown">
+            <button class="btn btn-secondary btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="bi bi-grid-3x3-gap"></i> Template <i class="bi bi-chevron-down ms-1" style="font-size:0.7rem;"></i>
             </button>
             <ul class="dropdown-menu">
@@ -48,10 +48,10 @@
         </div>
 
         <!-- Downloads -->
-        <a href="{{ url_for('resume_builder.download_pdf', gen_id=gen.id) }}" class="btn btn-danger btn-sm">
+        <a href="{{ url_for('resume_builder.download_pdf', gen_id=gen.id) }}" class="btn btn-danger btn-sm resume-download-btn">
             <i class="bi bi-file-pdf"></i> PDF
         </a>
-        <a href="{{ url_for('resume_builder.download_docx', gen_id=gen.id) }}" class="btn btn-info btn-sm" style="background:var(--info); color:white;">
+        <a href="{{ url_for('resume_builder.download_docx', gen_id=gen.id) }}" class="btn btn-info btn-sm resume-download-btn" style="background:var(--info); color:white;">
             <i class="bi bi-file-word"></i> DOCX
         </a>
     </div>
@@ -60,17 +60,17 @@
 <style>
     @media (max-width: 992px) {
         .preview-layout { grid-template-columns: 1fr !important; }
-        .resume-action-bar { flex-direction: column; align-items: stretch; }
-        .resume-action-bar > div { flex-wrap: wrap; justify-content: center; }
     }
 </style>
 <div class="preview-layout" style="display:grid; grid-template-columns:1fr 300px; gap:var(--space-5);">
 
 <!-- ── RESUME PREVIEW PANE ────────────────────────────────── -->
-<div class="fade-in-up-delay-1">
-    <!-- A4 canvas: 794px wide × auto tall -->
-    <div id="resumePreviewContainer" style="background:#e2e8f0; border-radius:var(--radius-lg); padding:24px; overflow-x:auto; overflow-y:visible;">
-        <div id="resumeRenderTarget" style="width:794px; min-height:1123px; margin:0 auto; background:white; box-shadow:0 4px 24px rgba(0,0,0,0.15); border-radius:4px;"></div>
+<div class="fade-in-up-delay-1" style="min-width:0; width:100%;">
+    <!-- A4 canvas: 794px wide × auto tall with responsive scale container -->
+    <div id="resumePreviewContainer" class="resume-preview-container">
+        <div id="resumeScaleWrapper" class="resume-scale-wrapper">
+            <div id="resumeRenderTarget" class="resume-render-target"></div>
+        </div>
     </div>
 
     <!-- Edit hint -->
@@ -221,6 +221,17 @@ function getData(content) {
                     });
                 }
             });
+        } else if (skillsRaw && typeof skillsRaw === 'object') {
+            Object.values(skillsRaw).forEach(v => {
+                if (typeof v === 'string') flat.push(v);
+                else if (Array.isArray(v)) flat.push(...v.map(String));
+                else if (v && typeof v === 'object') {
+                    Object.values(v).forEach(sub => {
+                        if (typeof sub === 'string') flat.push(sub);
+                        else if (Array.isArray(sub)) flat.push(...sub.map(String));
+                    });
+                }
+            });
         }
         return [...new Set(flat.filter(Boolean))];
     })();
@@ -258,11 +269,16 @@ function eduBlock(e) {
 }
 
 function projBlock(p, accent) {
+    const bullets = p.bullets || (p.description ? [p.description] : []);
     return '<div style="margin-bottom:12px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:baseline;">'
         + '<span style="font-weight:700;font-size:12pt;">' + (p.name||p.title||'') + '</span>'
-        + (p.github ? '<a href="'+p.github+'" style="font-size:10pt;color:'+accent+';margin-left:8px;">GitHub</a>' : '')
-        + '<div style="font-size:10.5pt;color:#334155;margin-top:3px;">' + (p.description||'') + '</div>'
-        + ((p.technologies||p.tech_stack) ? '<div style="font-size:10pt;color:#64748b;font-style:italic;">'+( p.technologies||p.tech_stack)+'</div>' : '')
+        + (p.github ? '<a href="'+p.github+'" style="font-size:10pt;color:'+accent+';margin-left:8px;" target="_blank">GitHub</a>' : '')
+        + '</div>'
+        + (bullets.length ? '<ul style="margin:4px 0 0 20px;padding:0;">'
+            + (Array.isArray(bullets)?bullets:[bullets]).map(b=>'<li style="font-size:10.5pt;color:#334155;margin-bottom:3px;">'+b+'</li>').join('')
+            + '</ul>' : (p.description ? '<div style="font-size:10.5pt;color:#334155;margin-top:3px;">' + p.description + '</div>' : ''))
+        + ((p.technologies||p.tech_stack) ? '<div style="font-size:10pt;color:#64748b;font-style:italic;margin-top:2px;">Technologies: '+( p.technologies||p.tech_stack)+'</div>' : '')
         + '</div>';
 }
 
@@ -422,6 +438,7 @@ function changeTemplate(templateId, templateName) {
     .then(data => {
         if (data.success) {
             renderResume(templateId, CONTENT);
+            requestAnimationFrame(scaleResumePreview);
             Toast.success(`Template changed to ${templateName}`);
         } else {
             Toast.error('Failed to change template.');
@@ -445,6 +462,7 @@ function regenerateSection(section) {
         if (data.success) {
             CONTENT[section] = data.content;
             renderResume(TEMPLATE, CONTENT);
+            requestAnimationFrame(scaleResumePreview);
             Toast.success(`"${section.replace('_',' ')}" regenerated!`);
         } else {
             Toast.error(`Regeneration failed: ${data.message || ''}`);
@@ -478,39 +496,61 @@ document.addEventListener('DOMContentLoaded', () => {
     renderResume(TEMPLATE, CONTENT);
     colorScoreBars();
     initProgressBars();
-    scaleResumePreview(); // mobile responsive scale
+    scaleResumePreview();
+
+    const container = document.getElementById('resumePreviewContainer');
+    if (window.ResizeObserver && container) {
+        const ro = new ResizeObserver(() => {
+            scaleResumePreview();
+        });
+        ro.observe(container);
+    }
 });
 
 // ── Mobile A4 Canvas Scale-to-Fit ────────────────────────────
-// Scales the 794px resume canvas to fit the viewport on mobile.
-// The actual PDF is generated server-side at full A4 — this only
-// affects the web preview display.
+// Scales the 794px resume canvas to fit the viewport seamlessly on mobile & tablets.
+// Negative margins compensate for the CSS transform geometry so zero horizontal
+// scroll occurs and text is never clipped or overflowing.
 function scaleResumePreview() {
     const target    = document.getElementById('resumeRenderTarget');
     const container = document.getElementById('resumePreviewContainer');
-    if (!target || !container) return;
+    const wrapper   = document.getElementById('resumeScaleWrapper');
+    if (!target || !container || !wrapper) return;
 
-    const containerW = container.clientWidth - 16; // 8px padding each side
+    // Reset styles so container width can be measured cleanly
+    target.style.transform   = 'none';
+    target.style.marginLeft  = '0px';
+    target.style.marginRight = '0px';
+    wrapper.style.height     = 'auto';
+
+    const containerStyle = window.getComputedStyle(container);
+    const paddingLeft  = parseFloat(containerStyle.paddingLeft) || 0;
+    const paddingRight = parseFloat(containerStyle.paddingRight) || 0;
+    const availableW   = container.clientWidth - paddingLeft - paddingRight;
     const docW = 794;
 
-    if (containerW < docW) {
-        const scale = containerW / docW;
-        target.style.transform      = `scale(${scale})`;
-        target.style.transformOrigin = 'top left';
-        // Compensate for the space the scaled element no longer occupies
-        const scaledHeight = target.scrollHeight * scale;
-        target.parentElement.style.height = scaledHeight + 'px';
-        target.parentElement.style.overflow = 'hidden';
+    if (availableW > 0 && availableW < docW) {
+        const scale = availableW / docW;
+        target.style.transform       = `scale(${scale})`;
+        target.style.transformOrigin = 'top center';
+        const offset = (availableW - docW) / 2;
+        target.style.marginLeft  = `${offset}px`;
+        target.style.marginRight = `${offset}px`;
+        const scaledHeight = Math.ceil(target.offsetHeight * scale);
+        wrapper.style.height = `${scaledHeight}px`;
     } else {
-        target.style.transform       = '';
-        target.style.transformOrigin = '';
-        target.parentElement.style.height   = '';
-        target.parentElement.style.overflow = '';
+        target.style.transform       = 'none';
+        target.style.marginLeft      = 'auto';
+        target.style.marginRight     = 'auto';
+        wrapper.style.height         = 'auto';
     }
 }
+
 window.addEventListener('resize', () => {
-    // Re-scale after template re-render settles
-    setTimeout(scaleResumePreview, 100);
+    requestAnimationFrame(scaleResumePreview);
+});
+window.addEventListener('orientationchange', () => {
+    setTimeout(scaleResumePreview, 150);
 });
 </script>
 {% endblock %}

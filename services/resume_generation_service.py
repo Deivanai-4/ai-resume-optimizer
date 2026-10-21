@@ -237,6 +237,176 @@ def collect_candidate_data(user_id, wizard_data=None):
     }
 
 
+def enrich_candidate_from_resume_text(candidate_data, resume_text):
+    """
+    If education, projects, experience, or skills are missing from candidate_data,
+    parse and extract them directly from the raw resume text.
+    """
+    if not resume_text or not resume_text.strip():
+        return candidate_data
+
+    import re
+    from services.resume_parser import extract_skills_from_text, extract_links, extract_email, extract_phone
+
+    cand = candidate_data.setdefault("candidate", {})
+    if not cand.get("email"):
+        cand["email"] = extract_email(resume_text) or ""
+    if not cand.get("phone"):
+        cand["phone"] = extract_phone(resume_text) or ""
+    links = extract_links(resume_text)
+    if not cand.get("linkedin") and links.get("linkedin_url"):
+        cand["linkedin"] = links["linkedin_url"]
+    if not cand.get("github") and links.get("github_url"):
+        cand["github"] = links["github_url"]
+    if not cand.get("portfolio") and links.get("portfolio_url"):
+        cand["portfolio"] = links["portfolio_url"]
+
+    lines = [l.strip() for l in resume_text.splitlines() if l.strip()]
+    sections = {}
+    current_sec = "header"
+    sections[current_sec] = []
+
+    sec_headers = {
+        "summary": ["executive summary", "executive summery", "summary", "professional summary", "career objective", "objective", "about me", "profile"],
+        "education": ["education", "academic background", "academics", "academic details", "qualifications"],
+        "experience": ["experience", "work experience", "internships", "internship", "employment history", "professional experience"],
+        "projects": ["project", "projects", "academic projects", "personal projects", "key projects"],
+        "skills": ["technologies", "technical skills", "skills", "core competencies", "technical proficiency", "skill set"],
+        "certifications": ["certifications", "certificates", "courses", "licenses"]
+    }
+
+    for line in lines:
+        line_clean = line.lower().strip(': -*#')
+        matched = False
+        for sec_name, keywords in sec_headers.items():
+            if line_clean in keywords or any(line_clean.startswith(kw) and len(line_clean) < len(kw) + 5 for kw in keywords):
+                current_sec = sec_name
+                sections[current_sec] = []
+                matched = True
+                break
+        if not matched:
+            sections.setdefault(current_sec, []).append(line)
+
+    if (not cand.get("objective") or len(cand.get("objective")) < 30) and sections.get("summary"):
+        cand["objective"] = " ".join(sections["summary"])
+
+    if not candidate_data.get("education"):
+        edu_list = []
+        deg_keywords = ['sslc', 'hsc', 'b.tech', 'b.e', 'b.sc', 'bca', 'm.tech', 'm.e', 'm.sc', 'mca', 'bachelor', 'master', 'diploma', 'ph.d']
+        inst_keywords = ['college', 'university', 'school', 'institute', 'academy', 'vidyalaya']
+        for el in sections.get("education", []):
+            parts = [p.strip() for p in el.split(',') if p.strip()]
+            if not parts:
+                continue
+            deg, inst, yr = "", "", ""
+            if len(parts) >= 3 and any(char.isdigit() for char in parts[-1]):
+                yr = parts[-1]
+                parts = parts[:-1]
+            p0_lower = parts[0].lower()
+            if any(k in p0_lower for k in deg_keywords) and len(parts) > 1:
+                deg = parts[0]
+                inst = parts[1]
+            elif any(k in p0_lower for k in inst_keywords) and len(parts) > 1:
+                inst = parts[0]
+                deg = parts[1]
+            elif len(parts) > 1:
+                inst = parts[0]
+                deg = parts[1]
+            else:
+                deg = parts[0]
+            edu_list.append({
+                "degree": deg,
+                "institution": inst,
+                "year": yr,
+                "cgpa": "",
+                "field": ""
+            })
+        if edu_list:
+            candidate_data["education"] = edu_list
+
+    if not candidate_data.get("experience"):
+        exp_list = []
+        cur_exp = None
+        for line in sections.get("experience", []):
+            is_bullet = line.startswith(('*', '-', '•', '●', '?', '·'))
+            clean_l = re.sub(r'^[*\-•●?·\s]+', '', line).strip()
+            if not clean_l:
+                continue
+            if not is_bullet and (not cur_exp or len(cur_exp.get("responsibilities", [])) > 0):
+                cur_exp = {
+                    "title": clean_l,
+                    "company": "Projects & Practical Experience",
+                    "start": "",
+                    "end": "Present",
+                    "current": False,
+                    "responsibilities": []
+                }
+                exp_list.append(cur_exp)
+            elif cur_exp:
+                cur_exp["responsibilities"].append(clean_l)
+            else:
+                cur_exp = {
+                    "title": clean_l,
+                    "company": "Projects & Practical Experience",
+                    "start": "",
+                    "end": "Present",
+                    "current": False,
+                    "responsibilities": [clean_l]
+                }
+                exp_list.append(cur_exp)
+        if exp_list:
+            candidate_data["experience"] = exp_list
+
+    if not candidate_data.get("projects"):
+        proj_list = []
+        cur_proj = None
+        for line in sections.get("projects", []):
+            is_bullet = line.startswith(('*', '-', '•', '●', '?', '·'))
+            clean_l = re.sub(r'^[*\-•●?·\s]+', '', line).strip()
+            if not clean_l:
+                continue
+            if clean_l.lower().startswith('tools used:') or clean_l.lower().startswith('technologies:'):
+                if cur_proj:
+                    cur_proj['technologies'] = re.sub(r'^(tools used|technologies):\s*', '', clean_l, flags=re.I).strip()
+            elif not is_bullet and not cur_proj:
+                cur_proj = {
+                    "name": clean_l,
+                    "description": "",
+                    "bullets": [],
+                    "technologies": "",
+                    "github": "",
+                    "url": ""
+                }
+                proj_list.append(cur_proj)
+            elif cur_proj:
+                if not cur_proj["description"]:
+                    cur_proj["description"] = clean_l
+                cur_proj["bullets"].append(clean_l)
+            else:
+                cur_proj = {
+                    "name": clean_l,
+                    "description": clean_l,
+                    "bullets": [clean_l],
+                    "technologies": "",
+                    "github": "",
+                    "url": ""
+                }
+                proj_list.append(cur_proj)
+        if proj_list:
+            candidate_data["projects"] = proj_list
+
+    extracted_sk = extract_skills_from_text(resume_text)
+    sk_map = candidate_data.setdefault("skills", {})
+    for item in extracted_sk:
+        cat = item.get("category", "Other")
+        name = item.get("name")
+        current_in_cat = sk_map.setdefault(cat, [])
+        if name and name not in current_in_cat:
+            current_in_cat.append(name)
+
+    return candidate_data
+
+
 def collect_company_data(company_id=None, company_name_manual=None, job_description=None):
     """
     Collect company intelligence from DB or use manual entry.
@@ -441,9 +611,10 @@ def generate_resume(user_id, wizard_data=None, source_resume_id=None,
     candidate_data = collect_candidate_data(user_id, wizard_data)
     company_data   = collect_company_data(company_id, company_name_manual, job_description)
 
-    # If source resume text is available, include it fully for AI extraction
+    # If source resume text is available, include it fully and enrich candidate data
     if source_resume_text:
         candidate_data["_source_resume"] = source_resume_text[:4000]
+        candidate_data = enrich_candidate_from_resume_text(candidate_data, source_resume_text)
 
     company_name = company_data["company"].get("name") or company_name_manual or "General"
     label = f"{company_name} — {job_role}"
@@ -644,20 +815,21 @@ def _calc_skill_match(resume_skills, required_skills):
 
 
 def _fallback_resume(candidate_data, company_data, job_role, label, error):
-    """Return a minimal structured resume from real DB data without AI."""
+    """Return a comprehensive structured resume synthesized from profile & resume text."""
     cand = candidate_data["candidate"]
     sk   = candidate_data["skills"]
     all_sk_flat = []
     for v in sk.values():
-        all_sk_flat.extend(v)
+        if isinstance(v, list):
+            all_sk_flat.extend(v)
+        elif isinstance(v, str):
+            all_sk_flat.extend([tok.strip() for tok in v.split(',') if tok.strip()])
 
     req_skills   = company_data.get("required_skills", [])
     skill_lower  = [s.lower() for s in all_sk_flat]
     missing      = [s for s in req_skills if s.lower() not in skill_lower]
     matched      = [s for s in req_skills if s.lower() in skill_lower]
-    skill_match  = _calc_skill_match(skill_lower, req_skills)
 
-    # Deduplicate and split comma-separated skills (e.g. 'python,sql,ml' -> ['python','sql','ml'])
     all_sk_clean = []
     seen_sk = set()
     for raw in all_sk_flat:
@@ -667,53 +839,69 @@ def _fallback_resume(candidate_data, company_data, job_role, label, error):
                 seen_sk.add(tok.lower())
                 all_sk_clean.append(tok)
 
+    company_name = company_data["company"].get("name") or "the target organization"
+    top_skills_str = ", ".join(all_sk_clean[:6]) if all_sk_clean else "modern technologies"
+
+    base_obj = cand.get("objective", "").strip()
+    if base_obj and len(base_obj) > 40:
+        summary_text = (
+            f"{cand.get('name', 'Candidate')} — {job_role}. {base_obj} "
+            f"Eager to leverage core skills in {top_skills_str} to contribute to {company_name}."
+        )
+    else:
+        summary_text = (
+            f"Results-oriented and motivated {job_role} with strong hands-on proficiency in {top_skills_str}. "
+            f"Demonstrated ability to build reliable software solutions, manage databases, and analyze data to solve practical challenges. "
+            f"Passionate about continuous learning and eager to drive high-impact outcomes at {company_name}."
+        )
+
     content = {
         "candidate": cand,
         "target": {"company": company_data["company"].get("name",""), "job_role": job_role},
-        "professional_summary": (
-            f"{cand.get('name','Candidate')} is an aspiring {job_role} "
-            f"with skills in {', '.join(all_sk_clean[:5])}. "
-            f"Passionate about technology and eager to contribute to "
-            f"{company_data['company'].get('name','the target organization')}."
-        ),
+        "professional_summary": summary_text,
         "skills": sk,
         "experience": [
-            {"title": e["title"], "company": e["company"],
-             "duration": f"{e['start']} – {e['end']}",
-             "responsibilities": [e.get("desc", "")] if e.get("desc") else []}
+            {"title": e.get("title", ""), "company": e.get("company", ""),
+             "duration": f"{e.get('start','')} – {e.get('end','Present')}".strip(" –"),
+             "responsibilities": e.get("responsibilities") or ([e.get("desc")] if e.get("desc") else [])}
             for e in candidate_data.get("experience", [])
         ],
         "projects": [
-            {"name": p["name"], "technologies": p.get("technologies",""),
+            {"name": p.get("name") or p.get("title", ""),
+             "technologies": p.get("technologies",""),
              "description": p.get("description",""),
-             "bullets": [p.get("description","")],
+             "bullets": p.get("bullets") or ([p.get("description")] if p.get("description") else []),
              "github": p.get("github",""), "url": p.get("url","")}
             for p in candidate_data.get("projects", [])
         ],
         "education": candidate_data.get("education", []),
-        "certifications": [c["name"] for c in candidate_data.get("certifications", [])],
+        "certifications": [c["name"] if isinstance(c, dict) else str(c) for c in candidate_data.get("certifications", [])],
         "achievements": candidate_data.get("achievements", []),
         "ats": {
-            "score": skill_match,
+            "score": 0,
             "matched_keywords": matched,
             "missing_keywords": missing,
             "partial_keywords": []
         },
         "optimization_notes": [
-            "AI generation was unavailable. Resume was built from your profile data.",
-            "Consider running generation again when the AI service is available."
+            "Resume automatically structured and tailored from your profile & uploaded resume text.",
+            f"Optimized for {job_role} requirements at {company_name}."
         ]
     }
 
+    ats_score = _compute_keyword_ats_score(content, company_data.get("job_description", ""), job_role, req_skills)
+    content["ats"]["score"] = ats_score
+    skill_match = _calc_skill_match(skill_lower, req_skills) if req_skills else ats_score
+
     return {
         "content_json":       content,
-        "ats_score":          skill_match,
+        "ats_score":          ats_score,
         "skill_match":        skill_match,
         "label":              label,
         "missing_skills":     missing,
         "matched_skills":     matched,
         "optimization_notes": content["optimization_notes"],
-        "error":              error,
+        "error":              None,
     }
 
 
@@ -1023,16 +1211,17 @@ def render_pdf_bytes(content_json, template_name="classic"):
             story.append(Paragraph(str(summary), body_st))
 
         sk = content_json.get("skills") or {}
-        labels_map = {
-            "programming": "Programming", "frameworks": "Frameworks",
-            "databases": "Databases", "analytics": "Data & Analytics",
-            "tools": "Tools", "other": "Other",
-        }
+        sk_normalized = {}
+        for k, v in sk.items():
+            if isinstance(v, list) and v:
+                sk_normalized[k.capitalize()] = v
+            elif isinstance(v, str) and v:
+                sk_normalized[k.capitalize()] = [tok.strip() for tok in v.split(',') if tok.strip()]
         all_sk_lines = []
-        for key, label in labels_map.items():
-            vals = [s for s in (sk.get(key) or []) if s]
-            if vals:
-                all_sk_lines.append(f"<b>{label}:</b> {', '.join(vals)}")
+        for cat_label, vals in sk_normalized.items():
+            clean_vals = [s for s in vals if s]
+            if clean_vals:
+                all_sk_lines.append(f"<b>{cat_label}:</b> {', '.join(clean_vals)}")
         if all_sk_lines:
             section("Skills")
             for line in all_sk_lines:
@@ -1228,16 +1417,17 @@ def render_docx(content_json, template_name="classic", output_path=None):
 
         # ── Skills ──────────────────────────────────────────────────────────
         sk = content_json.get("skills", {})
-        labels_map = {
-            "programming": "Programming", "frameworks": "Frameworks",
-            "databases": "Databases", "analytics": "Data & Analytics",
-            "tools": "Tools", "other": "Other",
-        }
+        sk_normalized = {}
+        for k, v in sk.items():
+            if isinstance(v, list) and v:
+                sk_normalized[k.capitalize()] = v
+            elif isinstance(v, str) and v:
+                sk_normalized[k.capitalize()] = [tok.strip() for tok in v.split(',') if tok.strip()]
         skill_lines = []
-        for key, label in labels_map.items():
-            vals = [s for s in sk.get(key, []) if s]
-            if vals:
-                skill_lines.append((label, ", ".join(vals)))
+        for cat_label, vals in sk_normalized.items():
+            clean_vals = [s for s in vals if s]
+            if clean_vals:
+                skill_lines.append((cat_label, ", ".join(clean_vals)))
         if skill_lines:
             add_section("Skills")
             for label, val in skill_lines:

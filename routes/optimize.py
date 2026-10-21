@@ -104,3 +104,183 @@ def run():
     except Exception as e:
         flash(f'Optimization failed. Please try again. Error: {str(e)}', 'danger')
         return redirect(url_for('optimize.index'))
+
+
+@optimize_bp.route('/optimize/download/<int:opt_id>/<fmt>')
+@login_required
+def download(opt_id, fmt):
+    """Download an optimized resume as PDF, DOCX, or TXT."""
+    user_id = session['user_id']
+    fmt = fmt.lower()
+    if fmt not in ('pdf', 'docx', 'txt'):
+        flash('Invalid format requested.', 'danger')
+        return redirect(url_for('optimize.index'))
+
+    row = query_db(
+        'SELECT * FROM optimized_resumes WHERE id=%s AND user_id=%s',
+        (opt_id, user_id), one=True
+    )
+    if not row:
+        flash('Optimized resume not found.', 'danger')
+        return redirect(url_for('optimize.index'))
+
+    text = (row.get('optimized_text') or '').strip()
+    filename_base = f'Tailored_Resume_{opt_id}'
+
+    # ── TXT ──────────────────────────────────────────────────────────
+    if fmt == 'txt':
+        from flask import Response
+        return Response(
+            text,
+            mimetype='text/plain',
+            headers={'Content-Disposition': f'attachment; filename="{filename_base}.txt"'}
+        )
+
+    # ── DOCX ─────────────────────────────────────────────────────────
+    if fmt == 'docx':
+        import io
+        from docx import Document
+        from docx.shared import Pt, RGBColor, Inches
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from flask import send_file
+
+        doc = Document()
+
+        # Page margins
+        for section in doc.sections:
+            section.top_margin    = Inches(0.75)
+            section.bottom_margin = Inches(0.75)
+            section.left_margin   = Inches(1.0)
+            section.right_margin  = Inches(1.0)
+
+        # Remove default paragraph spacing
+        from docx.oxml.ns import qn
+        from docx.oxml import OxmlElement
+
+        def set_para_spacing(para, before=0, after=0):
+            pPr = para._p.get_or_add_pPr()
+            spacing = OxmlElement('w:spacing')
+            spacing.set(qn('w:before'), str(before))
+            spacing.set(qn('w:after'), str(after))
+            pPr.append(spacing)
+
+        HEADING_COLOR = RGBColor(0x1E, 0x40, 0xAF)  # indigo-800
+
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if not line:
+                p = doc.add_paragraph()
+                set_para_spacing(p, before=0, after=40)
+                continue
+
+            # Detect section headings (ALL CAPS or ends with ':')
+            is_heading = (
+                line.isupper() and len(line) > 2
+                or (line.endswith(':') and len(line.split()) <= 5)
+            )
+
+            if is_heading:
+                p = doc.add_paragraph()
+                set_para_spacing(p, before=120, after=40)
+                run = p.add_run(line)
+                run.bold = True
+                run.font.size = Pt(11)
+                run.font.color.rgb = HEADING_COLOR
+                # Underline the heading
+                from docx.oxml import OxmlElement as OE
+                rPr = run._r.get_or_add_rPr()
+                u = OE('w:u')
+                u.set(qn('w:val'), 'single')
+                rPr.append(u)
+            elif line.startswith('•') or line.startswith('-'):
+                p = doc.add_paragraph(style='List Bullet')
+                set_para_spacing(p, before=0, after=20)
+                run = p.add_run(line.lstrip('•- ').strip())
+                run.font.size = Pt(10.5)
+            else:
+                p = doc.add_paragraph()
+                set_para_spacing(p, before=0, after=20)
+                run = p.add_run(line)
+                run.font.size = Pt(10.5)
+
+        buf = io.BytesIO()
+        doc.save(buf)
+        buf.seek(0)
+        return send_file(
+            buf,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            as_attachment=True,
+            download_name=f'{filename_base}.docx'
+        )
+
+    # ── PDF ──────────────────────────────────────────────────────────
+    if fmt == 'pdf':
+        import io
+        from flask import send_file
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+        from reportlab.lib.enums import TA_LEFT
+
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buf, pagesize=A4,
+            leftMargin=2.5*cm, rightMargin=2.5*cm,
+            topMargin=2*cm, bottomMargin=2*cm
+        )
+
+        styles = getSampleStyleSheet()
+        INDIGO = colors.HexColor('#1E40AF')
+
+        style_body = ParagraphStyle(
+            'body', parent=styles['Normal'],
+            fontSize=10.5, leading=16, spaceAfter=4,
+            textColor=colors.HexColor('#1e293b')
+        )
+        style_heading = ParagraphStyle(
+            'heading', parent=styles['Normal'],
+            fontSize=11.5, leading=16, spaceBefore=14, spaceAfter=4,
+            textColor=INDIGO, fontName='Helvetica-Bold',
+            borderPadding=(0, 0, 2, 0),
+        )
+        style_bullet = ParagraphStyle(
+            'bullet', parent=styles['Normal'],
+            fontSize=10.5, leading=15, spaceAfter=3,
+            leftIndent=14, bulletIndent=0,
+            textColor=colors.HexColor('#1e293b')
+        )
+
+        story = []
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if not line:
+                story.append(Spacer(1, 6))
+                continue
+
+            # Escape XML chars
+            safe = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+            is_heading = (
+                line.isupper() and len(line) > 2
+                or (line.endswith(':') and len(line.split()) <= 5)
+            )
+
+            if is_heading:
+                story.append(Paragraph(f'<u>{safe}</u>', style_heading))
+            elif line.startswith('•') or line.startswith('-'):
+                bullet_text = '• ' + safe.lstrip('•- ').strip()
+                story.append(Paragraph(bullet_text, style_bullet))
+            else:
+                story.append(Paragraph(safe, style_body))
+
+        doc.build(story)
+        buf.seek(0)
+        return send_file(
+            buf,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'{filename_base}.pdf'
+        )
+

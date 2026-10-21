@@ -61,28 +61,44 @@ def generate():
         (user_id,), one=True
     )
     
-    reports_dir = os.path.join('uploads', 'reports', str(user_id))
-    os.makedirs(reports_dir, exist_ok=True)
-    
+    from services.storage_service import (
+        get_temp_dir, upload_report_file, get_private_download_url,
+        is_cloudinary_id, delete_stored_file
+    )
     import uuid
     filename = f'{report_type.lower()}_report_{uuid.uuid4().hex[:8]}.pdf'
-    output_path = os.path.join(reports_dir, filename)
+    temp_dir = get_temp_dir()
+    temp_pdf_path = os.path.join(temp_dir, filename)
     
     try:
         result = generate_pdf_report(
-            user, profile, analysis, report_type, output_path,
+            user, profile, analysis, report_type, temp_pdf_path,
             interview_stats=interview_stats, roadmap=roadmap
         )
         
-        if result:
+        if result and os.path.exists(temp_pdf_path):
             title = f"{report_type} Report - {user['full_name']}"
-            report_id = ReportModel.create(user_id, report_type, title, output_path, 'PDF', analysis_id)
+            stored_path = upload_report_file(temp_pdf_path, user_id, report_type)
+            report_id = ReportModel.create(user_id, report_type, title, stored_path, 'PDF', analysis_id)
             log_activity(user_id, 'report_generate', f'Generated {report_type} Report')
             flash(f'{report_type} Report generated successfully! ✅', 'success')
+            
+            # Clean up temp file if uploaded to cloud
+            if is_cloudinary_id(stored_path) and os.path.exists(temp_pdf_path):
+                try:
+                    os.remove(temp_pdf_path)
+                except OSError:
+                    pass
         else:
-            flash('Report generation failed. reportlab may not be installed.', 'danger')
+            flash('Report generation failed. reportlab may not be installed or generation error occurred.', 'danger')
     except Exception as e:
+        current_app.logger.error(f"Report generation error: {e}")
         flash(f'Report generation error: {str(e)}', 'danger')
+        if os.path.exists(temp_pdf_path):
+            try:
+                os.remove(temp_pdf_path)
+            except OSError:
+                pass
     
     return redirect(url_for('reports.index'))
 
@@ -97,13 +113,24 @@ def download(report_id):
         flash('Report not found.', 'danger')
         return redirect(url_for('reports.index'))
     
-    if not os.path.exists(report['file_path']):
-        flash('Report file not found on server.', 'danger')
+    from services.storage_service import is_cloudinary_id, get_private_download_url
+    path = report['file_path']
+
+    if is_cloudinary_id(path):
+        try:
+            url = get_private_download_url(path, 'pdf')
+            return redirect(url)
+        except Exception as e:
+            current_app.logger.error(f"Failed to generate report download URL: {e}")
+            flash('Error generating secure download link.', 'danger')
+            return redirect(url_for('reports.index'))
+    else:
+        if os.path.exists(path):
+            return send_file(path,
+                             download_name=f"{report['title']}.pdf",
+                             as_attachment=True)
+        flash('This report was stored on a previous server and is no longer available for download.', 'warning')
         return redirect(url_for('reports.index'))
-    
-    return send_file(report['file_path'],
-                     download_name=f"{report['title']}.pdf",
-                     as_attachment=True)
 
 
 @reports_bp.route('/reports/delete/<int:report_id>', methods=['POST'])
@@ -112,11 +139,8 @@ def delete(report_id):
     user_id = session['user_id']
     report = ReportModel.get_by_id(report_id, user_id)
     if report:
-        try:
-            if os.path.exists(report['file_path']):
-                os.remove(report['file_path'])
-        except Exception:
-            pass
+        from services.storage_service import delete_stored_file
+        delete_stored_file(report['file_path'], resource_type='raw', is_private=True)
         ReportModel.delete(report_id, user_id)
         flash('Report deleted.', 'success')
     return redirect(url_for('reports.index'))

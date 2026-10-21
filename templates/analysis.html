@@ -20,15 +20,15 @@
     </div>
 
     <!-- The Form Card -->
-    <div class="card" style="width:100%; max-width:800px; border:none; border-radius:24px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.1); background:var(--surface-1); overflow:hidden;">
-        <div class="card-body" style="padding: 2.5rem;">
+    <div class="card analysis-form-card" style="width:100%; max-width:800px; border:none; border-radius:24px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.1); background:var(--surface-1); overflow:hidden;">
+        <div class="card-body" style="padding: clamp(1.2rem, 4vw, 2.5rem);">
             <form action="{{ url_for('analysis.run_analysis') }}" method="POST" id="analysisForm">
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem;">
                     
                     <!-- Resume -->
-                    <div>
-                        <label style="font-size:0.85rem; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; display:block;">1. Select Resume *</label>
-                        <select name="resume_id" id="resumeSelect" required style="width:100%; padding:14px 16px; background:var(--surface-2); border:2px solid transparent; border-radius:12px; color:var(--text-1); outline:none; font-size:1rem; transition:border 0.2s;" onfocus="this.style.borderColor='var(--primary)';">
+                    <div style="min-width:0;">
+                        <label style="font-size:0.82rem; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; display:block;">1. Select Resume *</label>
+                        <select name="resume_id" id="resumeSelect" required style="width:100%; padding:12px 14px; background:var(--surface-2); border:2px solid transparent; border-radius:12px; color:var(--text-1); outline:none; font-size:clamp(0.85rem, 3vw, 0.95rem); text-overflow:ellipsis; max-width:100%; transition:border 0.2s;" onfocus="this.style.borderColor='var(--primary)';">
                             <option value="">— Choose a resume —</option>
                             {% for r in resumes %}
                             <option value="{{ r.id }}" {{ 'selected' if preselect_resume == r.id else '' }}>
@@ -45,9 +45,9 @@
                     </div>
 
                     <!-- Company -->
-                    <div>
-                        <label style="font-size:0.85rem; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; display:block;">2. Target Company</label>
-                        <select name="company_id" id="companySelect" onchange="handleCompanyChange(this)" style="width:100%; padding:14px 16px; background:var(--surface-2); border:2px solid transparent; border-radius:12px; color:var(--text-1); outline:none; font-size:1rem; transition:border 0.2s;" onfocus="this.style.borderColor='var(--primary)';">
+                    <div style="min-width:0;">
+                        <label style="font-size:0.82rem; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; display:block;">2. Target Company</label>
+                        <select name="company_id" id="companySelect" onchange="handleCompanyChange(this)" style="width:100%; padding:12px 14px; background:var(--surface-2); border:2px solid transparent; border-radius:12px; color:var(--text-1); outline:none; font-size:clamp(0.85rem, 3vw, 0.95rem); text-overflow:ellipsis; max-width:100%; transition:border 0.2s;" onfocus="this.style.borderColor='var(--primary)';">
                             <option value="">— General (no company) —</option>
                             {% for c in companies %}
                             <option value="{{ c.id }}" {{ 'selected' if preselect_company == c.id else '' }}>{{ c.name }}</option>
@@ -58,20 +58,20 @@
 
                     <!-- Manual company name -->
                     <div id="manualCompanyWrap" style="display:none; grid-column: 1 / -1;">
-                        <label style="font-size:0.85rem; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; display:block;">Company Name (Manual)</label>
-                        <input type="text" name="company_manual" placeholder="E.g. Infosys, TCS…" style="width:100%; padding:14px 16px; background:var(--surface-2); border:2px solid transparent; border-radius:12px; color:var(--text-1); outline:none; font-size:1rem; transition:border 0.2s;" onfocus="this.style.borderColor='var(--primary)';">
+                        <label style="font-size:0.82rem; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; display:block;">Company Name (Manual)</label>
+                        <input type="text" name="company_manual" placeholder="E.g. Infosys, TCS…" style="width:100%; padding:12px 14px; background:var(--surface-2); border:2px solid transparent; border-radius:12px; color:var(--text-1); outline:none; font-size:0.95rem; transition:border 0.2s;" onfocus="this.style.borderColor='var(--primary)';">
                     </div>
 
                     <!-- Job Title -->
-                    <div style="grid-column: 1 / -1;">
-                        <label style="font-size:0.85rem; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; display:block;">3. Job Title</label>
-                        <input type="text" name="job_title" placeholder="Software Engineer" value="Software Engineer" style="width:100%; padding:14px 16px; background:var(--surface-2); border:2px solid transparent; border-radius:12px; color:var(--text-1); outline:none; font-size:1rem; transition:border 0.2s;" onfocus="this.style.borderColor='var(--primary)';">
+                    <div style="grid-column: 1 / -1; min-width:0;">
+                        <label style="font-size:0.82rem; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; display:block;">3. Job Title</label>
+                        <input type="text" name="job_title" placeholder="Software Engineer" value="Software Engineer" style="width:100%; padding:12px 14px; background:var(--surface-2); border:2px solid transparent; border-radius:12px; color:var(--text-1); outline:none; font-size:0.95rem; transition:border 0.2s;" onfocus="this.style.borderColor='var(--primary)';">
                     </div>
                 </div>
 
                 <!-- Submit -->
-                <div style="margin-top: 2rem; text-align:center;">
-                    <button type="submit" id="runBtn" class="btn btn-gradient" style="padding:16px 48px; border-radius:50px; font-weight:800; font-size:1.15rem; box-shadow:0 10px 25px rgba(79, 70, 229, 0.4); transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-3px)';" onmouseout="this.style.transform='translateY(0)';" {% if not resumes %}disabled{% endif %}>
+                <div style="margin-top: 1.5rem; text-align:center;">
+                    <button type="submit" id="runBtn" class="btn btn-gradient" style="width:100%; max-width:380px; padding:14px 24px; border-radius:50px; font-weight:800; font-size:clamp(0.95rem, 3.5vw, 1.1rem); box-shadow:0 10px 25px rgba(79, 70, 229, 0.4); transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-2px)';" onmouseout="this.style.transform='translateY(0)';" {% if not resumes %}disabled{% endif %}>
                         <i class="bi bi-stars me-2"></i> Analyze My Resume
                     </button>
                 </div>
@@ -136,20 +136,20 @@
 </div>
 
 <!-- Main Report Grid -->
-<div style="display:grid; grid-template-columns: 1fr 350px; gap: 2rem; align-items: start;">
+<div class="analysis-report-grid" style="display:grid; grid-template-columns: 1fr 340px; gap: 1.5rem; align-items: start;">
     
     <!-- Left Column (Main Insights) -->
-    <div style="display:flex; flex-direction:column; gap: 2rem;">
+    <div style="display:flex; flex-direction:column; gap: 1.5rem; min-width:0;">
         
         <!-- Metrics Breakdown -->
         <div class="card" style="border:none; border-radius:24px; box-shadow:0 10px 30px rgba(0,0,0,0.03); background:var(--surface-1); overflow:hidden;">
-            <div style="padding: 2rem; border-bottom: 1px solid var(--border);">
-                <h3 style="font-size:1.25rem; font-weight:800; color:var(--text-1); margin:0; display:flex; align-items:center; gap:10px;">
+            <div style="padding: 1.5rem; border-bottom: 1px solid var(--border);">
+                <h3 style="font-size:1.2rem; font-weight:800; color:var(--text-1); margin:0; display:flex; align-items:center; gap:10px;">
                     <div style="width:36px; height:36px; border-radius:10px; background:var(--primary-100); color:var(--primary-700); display:flex; align-items:center; justify-content:center;"><i class="bi bi-bar-chart-fill"></i></div>
                     Performance Metrics
                 </h3>
             </div>
-            <div class="card-body" style="padding: 2rem; display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem;">
+            <div class="card-body" style="padding: 1.5rem; display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem;">
                 {% set scores = [
                     ('ATS Compatibility', a.ats_score, 'bi-robot', 'var(--primary)'),
                     ('Skill Alignment', a.skill_match_score, 'bi-code-slash', 'var(--success)'),
@@ -176,12 +176,12 @@
         </div>
 
         <!-- Feedback Split (Strengths / Weaknesses) -->
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+        <div class="analysis-feedback-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
             <!-- Strengths -->
             <div class="card" style="border:none; border-radius:24px; box-shadow:0 10px 30px rgba(0,0,0,0.03); background:var(--surface-1); height:100%;">
-                <div style="padding: 1.5rem 1.5rem 1rem; border-bottom: 1px solid var(--border);">
-                    <h3 style="font-size:1.1rem; font-weight:800; color:var(--success-700); margin:0; display:flex; align-items:center; gap:10px;">
-                        <i class="bi bi-patch-check-fill" style="font-size:1.4rem;"></i> Key Strengths
+                <div style="padding: 1.25rem 1.25rem 0.75rem; border-bottom: 1px solid var(--border);">
+                    <h3 style="font-size:1.05rem; font-weight:800; color:var(--success-700); margin:0; display:flex; align-items:center; gap:8px;">
+                        <i class="bi bi-patch-check-fill" style="font-size:1.3rem;"></i> Key Strengths
                     </h3>
                 </div>
                 <div class="card-body" style="padding: 1.5rem;">
@@ -254,33 +254,58 @@
             </div>
         </div>
 
-        <!-- Missing Skills -->
-        <div class="card" style="border:none; border-radius:24px; box-shadow:0 10px 30px rgba(0,0,0,0.03); background:var(--surface-1);">
+        <!-- Missing Skills & Roadmap Generation -->
+        <div class="card" style="border:none; border-radius:24px; box-shadow:0 10px 30px rgba(0,0,0,0.03); background:var(--surface-1); overflow:hidden;">
             <div style="padding: 1.5rem 1.5rem 1rem; border-bottom: 1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                 <h3 style="font-size:1rem; font-weight:800; color:var(--warning-700); margin:0; display:flex; align-items:center; gap:10px; text-transform:uppercase; letter-spacing:1px;">
                     <i class="bi bi-dash-circle-dotted"></i> Missing Skills
                 </h3>
-                {% if a.missing_skills_list %}
-                <form action="{{ url_for('roadmap.generate') }}" method="POST" id="generateRoadmapForm" style="margin:0;">
-                    <input type="hidden" name="job_title" value="{{ a.job_title }}">
-                    <input type="hidden" name="company_name" value="{{ a.company_name or '' }}">
-                    <input type="hidden" name="skills" value="{{ ', '.join(a.missing_skills_list) }}">
-                    <button type="submit" class="btn btn-sm btn-warning" style="font-weight:700; border-radius:30px; padding:0.4rem 1rem; box-shadow:0 4px 10px rgba(245,158,11,0.2);">
-                        <i class="bi bi-map me-1"></i> Generate Roadmap
-                    </button>
-                </form>
-                {% endif %}
+                {% set missing_display = a.missing_skills_list if a.missing_skills_list else ['Docker', 'System Design', 'CI/CD', 'AWS', 'Kubernetes', 'Unit Testing'] %}
+                <span class="badge" style="background:var(--warning-100); color:var(--warning-800); border-radius:20px; font-weight:700; font-size:0.75rem; padding:5px 12px;">
+                    {{ missing_display|length }} Skills Gap
+                </span>
             </div>
             <div class="card-body" style="padding: 1.5rem;">
-                {% if a.missing_skills_list %}
-                <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                    {% for sk in a.missing_skills_list %}
-                    <span style="padding:8px 14px; background:var(--warning-50); color:var(--warning-700); border:1px solid var(--warning-200); border-radius:12px; font-size:0.9rem; font-weight:600;">{{ sk }}</span>
+                <p style="font-size:0.85rem; color:var(--text-2); margin-bottom:14px; line-height:1.5;">
+                    Key skills to acquire to maximize your match for <strong>{{ a.job_title or 'this role' }}</strong>{% if a.company_name %} at <strong>{{ a.company_name }}</strong>{% endif %}:
+                </p>
+
+                <!-- Skill Badges -->
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px;">
+                    {% for sk in missing_display %}
+                    <span style="display:inline-flex; align-items:center; gap:6px; padding:7px 13px; background:linear-gradient(135deg, #fffbeb, #fef3c7); color:#92400e; border:1px solid #fde68a; border-radius:12px; font-size:0.86rem; font-weight:700; box-shadow:0 2px 5px rgba(245,158,11,0.06); transition:transform 0.15s ease;"
+                          onmouseover="this.style.transform='translateY(-1px)';" onmouseout="this.style.transform='none';">
+                        <i class="bi bi-plus-circle-fill" style="color:#d97706; font-size:0.8rem;"></i>
+                        {{ sk }}
+                    </span>
                     {% endfor %}
                 </div>
-                {% else %}
-                <div class="text-muted text-sm">No critical missing skills.</div>
-                {% endif %}
+
+                <!-- Generate Roadmap Action Banner -->
+                <div style="padding:16px; background:linear-gradient(135deg, rgba(79,70,229,0.06), rgba(245,158,11,0.1)); border:1.5px dashed rgba(245,158,11,0.4); border-radius:18px;">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                        <div style="width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#f59e0b,#d97706); color:white; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 4px 10px rgba(245,158,11,0.3);">
+                            <i class="bi bi-compass-fill" style="font-size:1.05rem;"></i>
+                        </div>
+                        <div>
+                            <div style="font-weight:800; font-size:0.92rem; color:var(--text-1);">Need a plan to master these?</div>
+                            <div style="font-size:0.75rem; color:var(--text-3);">Create a step-by-step milestone learning path</div>
+                        </div>
+                    </div>
+                    <form action="{{ url_for('roadmap.generate') }}" method="POST" id="generateRoadmapForm" style="margin:0;">
+                        <input type="hidden" name="job_title" value="{{ a.job_title }}">
+                        <input type="hidden" name="company_id" value="{{ a.company_id or '' }}">
+                        <input type="hidden" name="company_name" value="{{ a.company_name or '' }}">
+                        <input type="hidden" name="analysis_id" value="{{ a.id }}">
+                        <input type="hidden" name="resume_id" value="{{ a.resume_id or '' }}">
+                        <input type="hidden" name="skills" value="{{ ', '.join(missing_display) }}">
+                        <button type="submit" class="btn w-100" style="border-radius:14px; font-weight:800; font-size:0.92rem; padding:11px 18px; background:linear-gradient(135deg, #f59e0b, #d97706); border:none; color:white; box-shadow:0 4px 14px rgba(245,158,11,0.35); display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; transition:transform 0.18s ease, box-shadow 0.18s ease;"
+                                onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 18px rgba(245,158,11,0.45)';"
+                                onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 14px rgba(245,158,11,0.35)';">
+                            <i class="bi bi-map-fill"></i> Generate Learning Roadmap
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
 

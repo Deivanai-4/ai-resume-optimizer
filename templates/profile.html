@@ -11,8 +11,12 @@
             <!-- Avatar -->
             <div class="profile-avatar-wrap">
                 {% if profile and profile.photo_path %}
-                <img src="{{ url_for('static', filename='uploads/' + profile.photo_path) }}" alt="{{ user.full_name }}"
-                    class="profile-avatar">
+                <img src="{% if profile.photo_path.startswith('http') or profile.photo_path.startswith('//') %}{{ profile.photo_path }}{% else %}{{ url_for('static', filename='uploads/' + profile.photo_path) }}{% endif %}" alt="{{ user.full_name }}"
+                    class="profile-avatar" onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="profile-avatar-initials" style="display:none">
+                    {{ (user.full_name or 'U')[0].upper() }}{% if user.full_name and ' ' in user.full_name %}{{
+                    user.full_name.split()[1][0].upper() }}{% endif %}
+                </div>
                 {% else %}
                 <div class="profile-avatar-initials">
                     {{ (user.full_name or 'U')[0].upper() }}{% if user.full_name and ' ' in user.full_name %}{{
@@ -110,7 +114,7 @@
                     <button type="button" class="btn btn-outline-primary btn-sm" onclick="openImportModal()">
                         <i class="bi bi-file-earmark-arrow-up"></i> Import from Resume
                     </button>
-                    <button type="button" class="btn btn-gradient btn-sm" onclick="document.getElementById('generateResumeModal').style.display='flex'">
+                    <button type="button" class="btn btn-gradient btn-sm" onclick="openGenerateModal()">
                         <i class="bi bi-stars"></i> Generate Resume
                     </button>
                 </div>
@@ -701,7 +705,7 @@
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check2"></i> Save Links
                         </button>
-                        <button type="button" class="btn btn-gradient" onclick="document.getElementById('generateResumeModal').style.display='flex'">
+                        <button type="button" class="btn btn-gradient" onclick="openGenerateModal()">
                             <i class="bi bi-stars"></i> Generate Resume
                         </button>
                     </div>
@@ -711,29 +715,40 @@
     </div>
 
     <!-- ── GENERATE RESUME MODAL ───────────────────────────────────── -->
-    <div id="generateResumeModal" class="modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
-        <div class="card profile-custom-modal-card" style="width:100%; max-width:500px; max-height:90vh; overflow-y:auto; background:var(--surface);">
-            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:var(--surface); z-index:10;">
-                <span class="card-header-title"><i class="bi bi-stars text-primary"></i> Generate ATS Resume</span>
-                <button type="button" class="btn btn-icon" onclick="document.getElementById('generateResumeModal').style.display='none'"><i class="bi bi-x-lg"></i></button>
+    <div id="generateResumeModal" class="custom-modal-overlay" style="display:none; position:fixed; inset:0; width:100%; height:100%; background:rgba(0,0,0,0.75); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); z-index:1060; align-items:center; justify-content:center; padding:var(--space-3);" onclick="if(event.target===this) this.style.display='none';">
+        <div class="card profile-custom-modal-card" style="width:100%; max-width:500px; max-height:88vh; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:0 20px 40px rgba(0,0,0,0.4); overflow:hidden;">
+            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; background:var(--surface); border-bottom:1px solid var(--border); padding:var(--space-3) var(--space-4); flex-shrink:0;">
+                <span class="card-header-title" style="font-weight:700; font-size:var(--text-base);"><i class="bi bi-stars text-primary me-2"></i>Generate ATS Resume</span>
+                <button type="button" class="btn btn-icon btn-sm" onclick="document.getElementById('generateResumeModal').style.display='none'" aria-label="Close modal"><i class="bi bi-x-lg"></i></button>
             </div>
-            <div class="card-body">
-                <p style="color:var(--text-3); font-size:var(--text-sm); margin-bottom:var(--space-4);">We will use your completed profile to generate a tailored, ATS-friendly resume.</p>
+            <div class="card-body" style="overflow-y:auto; flex:1; padding:var(--space-4);">
+                <!-- In-modal validation error alert -->
+                <div id="profileValError" class="alert alert-warning alert-dismissible fade show" style="display:none; font-size:var(--text-xs); margin-bottom:var(--space-3);" role="alert">
+                    <div style="display:flex; align-items:flex-start; gap:var(--space-2);">
+                        <i class="bi bi-exclamation-triangle-fill text-warning flex-shrink-0" style="margin-top:2px;"></i>
+                        <div style="flex:1;">
+                            <strong>Please complete before generating:</strong>
+                            <ul id="profileValErrorList" style="margin:4px 0 0 16px; padding:0; line-height:1.5;"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <p style="color:var(--text-3); font-size:var(--text-xs); margin-bottom:var(--space-4);">We will use your completed profile to generate a tailored, ATS-friendly resume.</p>
                 
                 <form action="{{ url_for('resume_builder.generate') }}" method="POST" id="profileGenerateForm" onsubmit="return validateProfileForResume(event)">
                     
-                    <div style="margin-bottom:var(--space-4);">
-                        <label class="form-label">Job Role / Title *</label>
-                        <input type="text" class="form-control" name="job_role" value="Software Engineer" required placeholder="e.g. Frontend Developer">
+                    <div style="margin-bottom:var(--space-3);">
+                        <label class="form-label" style="font-size:var(--text-xs); font-weight:700;">Job Role / Title *</label>
+                        <input type="text" class="form-control" name="job_role" value="Software Engineer" required placeholder="e.g. Software Engineer">
                     </div>
                     
-                    <div style="margin-bottom:var(--space-4);">
-                        <label class="form-label">Target Company (Optional)</label>
+                    <div style="margin-bottom:var(--space-3);">
+                        <label class="form-label" style="font-size:var(--text-xs); font-weight:700;">Target Company (Optional)</label>
                         <input type="text" class="form-control" name="company_name_manual" placeholder="e.g. Google, Amazon">
                     </div>
                     
                     <div style="margin-bottom:var(--space-4);">
-                        <label class="form-label">Select Template</label>
+                        <label class="form-label" style="font-size:var(--text-xs); font-weight:700;">Select Template</label>
                         <select class="form-select" name="template">
                             <option value="classic">Classic ATS</option>
                             <option value="modern">Modern Professional</option>
@@ -742,27 +757,27 @@
                     </div>
                     
                     <div style="display:flex; justify-content:flex-end;">
-                        <button type="submit" class="btn btn-gradient w-100">
-                            <i class="bi bi-magic"></i> Generate Now
+                        <button type="submit" class="btn btn-gradient w-100" style="min-height:42px; font-weight:700;">
+                            <i class="bi bi-magic me-1"></i> Generate Now
                         </button>
                     </div>
                 </form>
                 
-                <div id="profileGenLoading" style="display:none; text-align:center; margin-top:var(--space-4); color:var(--primary); font-weight:600;">
-                    <i class="bi bi-arrow-repeat spin"></i> Generating your resume, please wait...
+                <div id="profileGenLoading" style="display:none; text-align:center; margin-top:var(--space-4); color:var(--primary); font-weight:600; font-size:var(--text-sm);">
+                    <i class="bi bi-arrow-repeat spin me-1"></i> Generating your resume, please wait...
                 </div>
             </div>
         </div>
     </div>
 
     <!-- ── IMPORT RESUME MODAL ───────────────────────────────────── -->
-    <div id="importResumeModal" class="modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
-        <div class="card profile-custom-modal-card" style="width:100%; max-width:800px; max-height:90vh; overflow-y:auto; position:relative; background:var(--surface);">
-            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:var(--surface); z-index:10;">
-                <span class="card-header-title"><i class="bi bi-file-earmark-text text-primary"></i> Import Details from Resume</span>
-                <button type="button" class="btn btn-icon" onclick="closeImportModal()"><i class="bi bi-x-lg"></i></button>
+    <div id="importResumeModal" class="custom-modal-overlay" style="display:none; position:fixed; inset:0; width:100%; height:100%; background:rgba(0,0,0,0.75); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); z-index:1060; align-items:center; justify-content:center; padding:var(--space-3);" onclick="if(event.target===this) closeImportModal();">
+        <div class="card profile-custom-modal-card" style="width:100%; max-width:800px; max-height:88vh; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:0 20px 40px rgba(0,0,0,0.4); overflow:hidden;">
+            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; background:var(--surface); border-bottom:1px solid var(--border); padding:var(--space-3) var(--space-4); flex-shrink:0;">
+                <span class="card-header-title" style="font-weight:700; font-size:var(--text-base);"><i class="bi bi-file-earmark-text text-primary me-2"></i>Import Details from Resume</span>
+                <button type="button" class="btn btn-icon btn-sm" onclick="closeImportModal()" aria-label="Close modal"><i class="bi bi-x-lg"></i></button>
             </div>
-            <div class="card-body">
+            <div class="card-body" style="overflow-y:auto; flex:1; padding:var(--space-4);">
                 
                 <!-- STEP 1: SELECT OR UPLOAD -->
                 <div id="importStep1">
@@ -1118,13 +1133,33 @@
         
         if (missing.length > 0) {
             event.preventDefault();
-            alert("Please complete the following profile sections before generating a resume:\n- " + missing.join("\n- "));
-            document.getElementById('generateResumeModal').style.display = 'none';
+            const errBox = document.getElementById('profileValError');
+            const errList = document.getElementById('profileValErrorList');
+            if (errBox && errList) {
+                errList.innerHTML = missing.map(m => `<li>${m}</li>`).join('');
+                errBox.style.display = 'block';
+                errBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            if (window.Toast) {
+                Toast.warning('Complete required profile sections first');
+            }
             return false;
         }
         
-        document.getElementById('profileGenLoading').style.display = 'flex';
+        document.getElementById('profileGenLoading').style.display = 'block';
         return true;
+    }
+
+    function openGenerateModal() {
+        const errBox = document.getElementById('profileValError');
+        if (errBox) errBox.style.display = 'none';
+        const modal = document.getElementById('generateResumeModal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeGenerateModal() {
+        const modal = document.getElementById('generateResumeModal');
+        if (modal) modal.style.display = 'none';
     }
 </script>
 {% endblock %}
