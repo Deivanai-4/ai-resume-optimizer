@@ -10,7 +10,10 @@ from flask_bcrypt import Bcrypt
 bcrypt = Bcrypt()
 
 
-def create_app(config_name="default"):
+def create_app(config_name=None):
+    if not config_name:
+        config_name = os.environ.get('FLASK_CONFIG', 'default')
+
     # Configure global logging
     logging.basicConfig(
         level=logging.INFO,
@@ -29,14 +32,27 @@ def create_app(config_name="default"):
     if not _secret:
         raise ValueError(
             "SECRET_KEY environment variable is not set. "
-            "Set it in your Render dashboard (or .env for local dev) "
+            "Set it in your Render/Vercel dashboard (or .env for local dev) "
             "before starting the application."
         )
     app.secret_key = _secret
-    # Create Upload Folders
-    upload_base = app.config["UPLOAD_FOLDER"]
-    for folder in ["resumes", "photos", "reports"]:
-        os.makedirs(os.path.join(upload_base, folder), exist_ok=True)
+
+    # Create Upload Folders only in local writable development environments.
+    # On serverless platforms (Vercel, AWS Lambda), files are preserved in persistent
+    # cloud storage (Cloudinary) and temporary operations use /tmp, so we never attempt
+    # to create folders inside /var/task.
+    upload_base = app.config.get("UPLOAD_FOLDER", "")
+    is_serverless = bool(
+        os.environ.get('VERCEL')
+        or os.environ.get('VERCEL_ENV')
+        or os.environ.get('LAMBDA_TASK_ROOT')
+        or os.environ.get('AWS_LAMBDA_FUNCTION_NAME')
+        or upload_base.startswith('/var/task')
+        or os.path.dirname(os.path.abspath(__file__)).startswith('/var/task')
+    )
+    if not is_serverless and upload_base:
+        for folder in ["resumes", "photos", "reports"]:
+            os.makedirs(os.path.join(upload_base, folder), exist_ok=True)
 
     # Initialize Extensions
     bcrypt.init_app(app)
@@ -127,7 +143,8 @@ def create_app(config_name="default"):
     return app
 
 
-app = create_app()
+_config_name = os.environ.get('FLASK_CONFIG', 'default')
+app = create_app(_config_name)
 
 if __name__ == "__main__":
     app.run(debug=True)
