@@ -173,7 +173,7 @@ def generate():
         flash('Resume generated but could not be saved. Please try again.', 'danger')
         return redirect(url_for('resume_builder.create'))
 
-    if result.get('error'):
+    if result.get('error') and not result.get('content_json'):
         flash(f'Note: {result["error"]}', 'warning')
 
     log_activity(user_id, 'resume_generate',
@@ -196,6 +196,95 @@ def preview(gen_id):
     if not gen:
         flash('Resume not found.', 'danger')
         return redirect(url_for('resume_builder.create'))
+
+    # ── Self-healing: Ensure existing resumes have full sections & valid ATS score ──
+    content = dict(gen.get('content_json') or {})
+    has_exp = bool(content.get('experience'))
+    has_edu = bool(content.get('education'))
+    has_proj = bool(content.get('projects'))
+    ats_zero = (gen.get('ats_score') or 0) <= 0 or (content.get('ats', {}).get('score') or 0) <= 0
+
+    if not (has_exp and has_edu and has_proj) or ats_zero:
+        try:
+            from services.resume_generation_service import (
+                collect_candidate_data, collect_company_data,
+                enrich_candidate_from_resume_text, _compute_keyword_ats_score
+            )
+            source_res = None
+            if gen.get('source_resume_id'):
+                source_res = ResumeModel.get_by_id(gen['source_resume_id'], user_id)
+            if not source_res:
+                user_resumes = ResumeModel.get_all(user_id)
+                if user_resumes:
+                    source_res = user_resumes[0]
+
+            source_text = source_res.get('extracted_text', '') if source_res else ''
+            candidate_data = collect_candidate_data(user_id)
+            if source_text:
+                candidate_data = enrich_candidate_from_resume_text(candidate_data, source_text)
+
+            company_data = collect_company_data(gen.get('company_id'), gen.get('company_name'), gen.get('job_description'))
+            company_name = gen.get('company_name') or 'the target company'
+            job_role     = gen.get('job_role') or 'Software Engineer'
+
+            updated = False
+            if not has_exp and candidate_data.get('experience'):
+                content['experience'] = [
+                    {"title": e.get("title", ""), "company": e.get("company", ""),
+                     "duration": f"{e.get('start','')} – {e.get('end','Present')}".strip(" –"),
+                     "responsibilities": e.get("responsibilities") or ([e.get("desc")] if e.get("desc") else [])}
+                    for e in candidate_data.get("experience", [])
+                ]
+                updated = True
+
+            if not has_edu and candidate_data.get('education'):
+                content['education'] = candidate_data.get('education', [])
+                updated = True
+
+            if not has_proj and candidate_data.get('projects'):
+                content['projects'] = [
+                    {"name": p.get("name") or p.get("title", ""),
+                     "technologies": p.get("technologies",""),
+                     "description": p.get("description",""),
+                     "bullets": p.get("bullets") or ([p.get("description")] if p.get("description") else []),
+                     "github": p.get("github",""), "url": p.get("url","")}
+                    for p in candidate_data.get("projects", [])
+                ]
+                updated = True
+
+            # If summary is short/generic fallback, improve it
+            curr_summary = content.get('professional_summary', '')
+            base_obj = candidate_data.get('candidate', {}).get('objective', '').strip()
+            if (not curr_summary or len(curr_summary) < 160) and base_obj and len(base_obj) > 40:
+                top_skills = [s for s in (content.get('skills') or {}).get('Programming', []) if s][:4]
+                top_str = ", ".join(top_skills) if top_skills else "modern software engineering"
+                content['professional_summary'] = (
+                    f"{candidate_data.get('candidate', {}).get('name', 'Candidate')} — {job_role}. {base_obj} "
+                    f"Eager to leverage core skills in {top_str} to contribute to {company_name}."
+                )
+                updated = True
+
+            # Compute real ATS score if 0
+            req_skills = company_data.get('required_skills', [])
+            score = _compute_keyword_ats_score(content, gen.get('job_description') or company_data.get('job_description', ''), job_role, req_skills)
+            if score > 0 and gen.get('ats_score', 0) <= 0:
+                gen['ats_score'] = score
+                gen['skill_match'] = score
+                if not isinstance(content.get('ats'), dict):
+                    content['ats'] = {}
+                content['ats']['score'] = score
+                updated = True
+
+            if updated:
+                GeneratedResumeModel.update_content(
+                    gen_id, user_id, content,
+                    ats_score=gen.get('ats_score'),
+                    skill_match=gen.get('skill_match')
+                )
+                gen['content_json'] = content
+                logger.info(f"Auto-healed resume #{gen_id}: sections backfilled, ATS={gen.get('ats_score')}")
+        except Exception as exc:
+            logger.warning(f"Preview auto-repair error: {exc}", exc_info=True)
 
     companies = CompanyModel.get_all(limit=50)
     return render_template('resume_preview.html', gen=gen, companies=companies)

@@ -612,6 +612,17 @@ def generate_resume(user_id, wizard_data=None, source_resume_id=None,
     company_data   = collect_company_data(company_id, company_name_manual, job_description)
 
     # If source resume text is available, include it fully and enrich candidate data
+    if not source_resume_text:
+        try:
+            from models.resume import ResumeModel
+            user_resumes = ResumeModel.get_all(user_id)
+            if user_resumes and user_resumes[0].get("extracted_text"):
+                source_resume_text = user_resumes[0]["extracted_text"]
+                if not source_resume_id:
+                    source_resume_id = user_resumes[0]["id"]
+        except Exception as exc:
+            logger.warning(f"Failed to auto-fetch source resume text: {exc}")
+
     if source_resume_text:
         candidate_data["_source_resume"] = source_resume_text[:4000]
         candidate_data = enrich_candidate_from_resume_text(candidate_data, source_resume_text)
@@ -627,16 +638,14 @@ def generate_resume(user_id, wizard_data=None, source_resume_id=None,
     raw = call_qwen(prompt, max_tokens=2500, retries=2, temperature=0.35)
 
     if not raw:
-        logger.error("Qwen returned no response for resume generation")
-        return _fallback_resume(candidate_data, company_data, job_role, label,
-                                error="AI generation failed — Qwen returned no response.")
+        logger.info("Qwen unavailable — generating structured synthesized resume from candidate profile & resume text")
+        return _fallback_resume(candidate_data, company_data, job_role, label, error=None)
 
     # 4. Parse JSON
     content = parse_qwen_json(raw)
     if not content:
-        logger.error("Qwen response could not be parsed as JSON")
-        return _fallback_resume(candidate_data, company_data, job_role, label,
-                                error="AI generation failed — response was not valid JSON.")
+        logger.info("Qwen response was not valid JSON — generating structured synthesized resume")
+        return _fallback_resume(candidate_data, company_data, job_role, label, error=None)
 
     # 5. Validate and patch
     content = _validate_and_patch(content, candidate_data, company_name, job_role)

@@ -210,28 +210,23 @@ function getData(content) {
     const candidate = c.candidate || {};
     const skillsRaw = c.skills || [];
     const skillList = (() => {
-        const flat = [];
+        const addSkill = (val) => {
+            if (typeof val === 'string') {
+                val.split(',').forEach(tok => {
+                    const clean = tok.trim();
+                    if (clean && clean.length > 1) flat.push(clean);
+                });
+            } else if (Array.isArray(val)) {
+                val.forEach(item => addSkill(item));
+            } else if (val && typeof val === 'object') {
+                Object.values(val).forEach(item => addSkill(item));
+            }
+        };
+
         if (Array.isArray(skillsRaw)) {
-            skillsRaw.forEach(s => {
-                if (typeof s === 'string') flat.push(s);
-                else if (s && typeof s === 'object') {
-                    Object.values(s).forEach(v => {
-                        if (typeof v === 'string') flat.push(v);
-                        else if (Array.isArray(v)) flat.push(...v.map(String));
-                    });
-                }
-            });
+            skillsRaw.forEach(s => addSkill(s));
         } else if (skillsRaw && typeof skillsRaw === 'object') {
-            Object.values(skillsRaw).forEach(v => {
-                if (typeof v === 'string') flat.push(v);
-                else if (Array.isArray(v)) flat.push(...v.map(String));
-                else if (v && typeof v === 'object') {
-                    Object.values(v).forEach(sub => {
-                        if (typeof sub === 'string') flat.push(sub);
-                        else if (Array.isArray(sub)) flat.push(...sub.map(String));
-                    });
-                }
-            });
+            Object.values(skillsRaw).forEach(v => addSkill(v));
         }
         return [...new Set(flat.filter(Boolean))];
     })();
