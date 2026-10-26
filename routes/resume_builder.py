@@ -99,9 +99,11 @@ def generate():
     company_name_man  = form.get('company_name_manual', '').strip()
     job_role          = form.get('job_role', 'Software Engineer').strip() or 'Software Engineer'
     job_description   = form.get('job_description', '').strip()
-    template          = form.get('template', 'classic')
-    if template not in ('classic', 'modern', 'minimal'):
-        template = 'classic'
+    template          = form.get('template', 'classic_ats')
+    valid_templates   = ('classic', 'modern', 'minimal', 'classic_ats', 'modern_pro',
+                         'minimal_ats', 'profile_photo', 'tech_dev', 'clean_classic', 'prestige_red')
+    if template not in valid_templates:
+        template = 'classic_ats'
 
     # ── Wizard data (Flow B — no resume) ────────────────────────────────────
     wizard_raw = form.get('wizard_data', '')
@@ -381,7 +383,9 @@ def change_template(gen_id):
     try:
         body     = request.get_json(force=True) or {}
         template = body.get('template', 'classic_ats')
-        if template not in ('classic_ats', 'modern_pro', 'minimal_ats', 'profile_photo', 'tech_dev'):
+        valid_templates = ('classic', 'modern', 'minimal', 'classic_ats', 'modern_pro',
+                           'minimal_ats', 'profile_photo', 'tech_dev', 'clean_classic', 'prestige_red')
+        if template not in valid_templates:
             return jsonify({'success': False, 'message': 'Invalid template'}), 400
         GeneratedResumeModel.update_template(gen_id, user_id, template)
         return jsonify({'success': True})

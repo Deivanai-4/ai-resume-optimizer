@@ -1,6 +1,6 @@
 """Reports Blueprint."""
 import os
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_file
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_file, current_app
 from utils.decorators import login_required
 from utils.helpers import log_activity, parse_json_field
 from models.report import ReportModel

@@ -745,19 +745,98 @@ def _validate_and_patch(content, candidate_data, company_name, job_role):
 
 
 def _flat_skills(skills_dict):
-    """Flatten skills dict to a deduplicated list of lowercase skill tokens.
+    """Flatten skills dict or list to a deduplicated list of lowercase skill tokens.
     Handles comma-separated strings like 'python,sql,ml' correctly."""
     flat = set()
-    for v in skills_dict.values():
-        if isinstance(v, list):
+    if isinstance(skills_dict, dict):
+        items = skills_dict.values()
+    elif isinstance(skills_dict, (list, tuple, set)):
+        items = [skills_dict]
+    elif isinstance(skills_dict, str):
+        items = [[skills_dict]]
+    else:
+        items = []
+
+    for v in items:
+        if isinstance(v, (list, tuple, set)):
             for s in v:
                 if s and isinstance(s, str):
-                    # Split on comma to handle 'python,sql,ml' stored as single string
                     for tok in s.split(','):
                         tok = tok.strip().lower()
                         if tok:
                             flat.add(tok)
+        elif isinstance(v, str):
+            for tok in v.split(','):
+                tok = tok.strip().lower()
+                if tok:
+                    flat.add(tok)
     return list(flat)
+
+
+def _safe_xml(val):
+    """Safely escape text for ReportLab Paragraph XML parser."""
+    if val is None:
+        return ""
+    import re
+    s = str(val)
+    # Replace & with &amp; if not already an entity
+    s = re.sub(r'&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)', '&amp;', s)
+    return s
+
+
+def _normalize_skills_dict(skills_input):
+    """
+    Normalizes skills into a dict of {category_label: [skill1, skill2, ...]}.
+    Safely accepts dict, list, set, or string. Never crashes.
+    """
+    normalized = {}
+    if not skills_input:
+        return normalized
+
+    if isinstance(skills_input, dict):
+        for k, v in skills_input.items():
+            cat = str(k).replace('_', ' ').title()
+            if isinstance(v, (list, tuple, set)):
+                tokens = []
+                for item in v:
+                    if item and isinstance(item, str):
+                        for tok in item.split(','):
+                            tok = tok.strip()
+                            if tok:
+                                tokens.append(tok)
+                if tokens:
+                    normalized[cat] = tokens
+            elif isinstance(v, str) and v.strip():
+                tokens = [tok.strip() for tok in v.split(',') if tok.strip()]
+                if tokens:
+                    normalized[cat] = tokens
+        return normalized
+
+    if isinstance(skills_input, (list, tuple, set)):
+        clean_tokens = []
+        for item in skills_input:
+            if isinstance(item, str):
+                for tok in item.split(','):
+                    tok = tok.strip()
+                    if tok:
+                        clean_tokens.append(tok)
+            elif isinstance(item, dict):
+                name = item.get("name") or item.get("skill_name")
+                if name:
+                    cat = str(item.get("category") or "Technical Skills").replace('_', ' ').title()
+                    normalized.setdefault(cat, []).append(str(name).strip())
+        if clean_tokens:
+            normalized.setdefault("Technical Skills", []).extend(clean_tokens)
+        return normalized
+
+    if isinstance(skills_input, str):
+        tokens = [tok.strip() for tok in skills_input.split(',') if tok.strip()]
+        if tokens:
+            normalized["Technical Skills"] = tokens
+        return normalized
+
+    return normalized
+
 
 
 def _compute_keyword_ats_score(content, job_description, job_role, required_skills):
@@ -1015,20 +1094,12 @@ def render_pdf(content_json, template_name="classic", output_path=None):
             story.append(Paragraph(summary, body_st))
 
         # ── Skills ──────────────────────────────────────────────────────────
-        sk = content_json.get("skills", {})
+        sk_dict = _normalize_skills_dict(content_json.get("skills"))
         all_sk_lines = []
-        labels_map = {
-            "programming": "Programming",
-            "frameworks":  "Frameworks",
-            "databases":   "Databases",
-            "analytics":   "Data & Analytics",
-            "tools":       "Tools",
-            "other":       "Other",
-        }
-        for key, label in labels_map.items():
-            vals = [s for s in sk.get(key, []) if s]
-            if vals:
-                all_sk_lines.append(f"<b>{label}:</b> {', '.join(vals)}")
+        for cat_label, vals in sk_dict.items():
+            clean_vals = [_safe_xml(s) for s in vals if s]
+            if clean_vals:
+                all_sk_lines.append(f"<b>{_safe_xml(cat_label)}:</b> {', '.join(clean_vals)}")
         if all_sk_lines:
             section("Skills")
             for line in all_sk_lines:
@@ -1039,53 +1110,67 @@ def render_pdf(content_json, template_name="classic", output_path=None):
         if education:
             section("Education")
             for edu in education:
-                deg  = edu.get("degree", "")
-                inst = edu.get("institution", "")
-                yr   = edu.get("year", "")
-                cgpa = f" | CGPA: {edu['cgpa']}" if edu.get("cgpa") else ""
-                field = f", {edu['field']}" if edu.get("field") else ""
-                story.append(Paragraph(f"<b>{deg}{field}</b>", job_title_st))
-                story.append(Paragraph(f"{inst}  {yr}{cgpa}", meta_st))
+                if isinstance(edu, dict):
+                    deg  = _safe_xml(edu.get("degree", ""))
+                    inst = _safe_xml(edu.get("institution", ""))
+                    yr   = _safe_xml(edu.get("year", ""))
+                    cgpa = f" | CGPA: {_safe_xml(edu['cgpa'])}" if edu.get("cgpa") else ""
+                    field = f", {_safe_xml(edu['field'])}" if edu.get("field") else ""
+                    story.append(Paragraph(f"<b>{deg}{field}</b>", job_title_st))
+                    story.append(Paragraph(f"{inst}  {yr}{cgpa}", meta_st))
+                elif edu:
+                    story.append(Paragraph(f"<b>{_safe_xml(edu)}</b>", job_title_st))
 
         # ── Experience ──────────────────────────────────────────────────────
         experience = content_json.get("experience", [])
         if experience:
             section("Experience")
             for exp in experience:
-                title   = exp.get("title", "")
-                company = exp.get("company", "")
-                dur     = exp.get("duration", "")
-                if title or company:
-                    story.append(Paragraph(f"<b>{title}</b> — {company}", job_title_st))
-                    if dur:
-                        story.append(Paragraph(dur, meta_st))
-                for resp in (exp.get("responsibilities") or []):
-                    if resp:
-                        story.append(Paragraph(f"• {resp}", bullet_st))
-                story.append(Spacer(1, 4))
+                if isinstance(exp, dict):
+                    title   = _safe_xml(exp.get("title", ""))
+                    company = _safe_xml(exp.get("company", ""))
+                    dur     = _safe_xml(exp.get("duration", ""))
+                    if title or company:
+                        story.append(Paragraph(f"<b>{title}</b> — {company}", job_title_st))
+                        if dur:
+                            story.append(Paragraph(dur, meta_st))
+                    resps = exp.get("responsibilities") or ([exp.get("desc")] if exp.get("desc") else [])
+                    if isinstance(resps, str):
+                        resps = [resps]
+                    for resp in resps:
+                        if resp:
+                            story.append(Paragraph(f"• {_safe_xml(resp)}", bullet_st))
+                    story.append(Spacer(1, 4))
+                elif exp:
+                    story.append(Paragraph(f"<b>{_safe_xml(exp)}</b>", job_title_st))
 
         # ── Projects ────────────────────────────────────────────────────────
         projects = content_json.get("projects", [])
         if projects:
             section("Projects")
             for proj in projects:
-                name  = proj.get("name", "")
-                tech  = proj.get("technologies", "")
-                desc  = proj.get("description", "")
-                bullets = proj.get("bullets", [])
-                gh    = proj.get("github", "")
-                header = f"<b>{name}</b>"
-                if tech:
-                    header += f" <font color='#64748B' size='8'>| {tech}</font>"
-                story.append(Paragraph(header, job_title_st))
-                if desc and not bullets:
-                    story.append(Paragraph(desc, bullet_st))
-                for b in (bullets or []):
-                    if b:
-                        story.append(Paragraph(f"• {b}", bullet_st))
-                if gh:
-                    story.append(Paragraph(f"<font color='#2563EB'>{gh}</font>", meta_st))
-                story.append(Spacer(1, 4))
+                if isinstance(proj, dict):
+                    name  = _safe_xml(proj.get("name", ""))
+                    tech  = _safe_xml(proj.get("technologies", ""))
+                    desc  = _safe_xml(proj.get("description", ""))
+                    bullets = proj.get("bullets", [])
+                    if isinstance(bullets, str):
+                        bullets = [bullets]
+                    gh    = _safe_xml(proj.get("github", ""))
+                    header = f"<b>{name}</b>"
+                    if tech:
+                        header += f" <font color='#64748B' size='8'>| {tech}</font>"
+                    story.append(Paragraph(header, job_title_st))
+                    if desc and not bullets:
+                        story.append(Paragraph(desc, bullet_st))
+                    for b in (bullets or []):
+                        if b:
+                            story.append(Paragraph(f"• {_safe_xml(b)}", bullet_st))
+                    if gh:
+                        story.append(Paragraph(f"<font color='#2563EB'>{gh}</font>", meta_st))
+                    story.append(Spacer(1, 4))
+                elif proj:
+                    story.append(Paragraph(f"<b>{_safe_xml(proj)}</b>", job_title_st))
 
         # ── Certifications ──────────────────────────────────────────────────
         certs = content_json.get("certifications", [])
@@ -1094,11 +1179,11 @@ def render_pdf(content_json, template_name="classic", output_path=None):
             for cert in certs:
                 if isinstance(cert, dict):
                     story.append(Paragraph(
-                        f"• <b>{cert.get('name','')}</b> — {cert.get('org','')} ({cert.get('year','')})",
+                        f"• <b>{_safe_xml(cert.get('name',''))}</b> — {_safe_xml(cert.get('org',''))} ({_safe_xml(cert.get('year',''))})",
                         bullet_st
                     ))
-                else:
-                    story.append(Paragraph(f"• {cert}", bullet_st))
+                elif cert:
+                    story.append(Paragraph(f"• {_safe_xml(cert)}", bullet_st))
 
         # ── Achievements ────────────────────────────────────────────────────
         achievements = content_json.get("achievements", [])
@@ -1107,11 +1192,11 @@ def render_pdf(content_json, template_name="classic", output_path=None):
             for ach in achievements:
                 if isinstance(ach, dict):
                     story.append(Paragraph(
-                        f"• <b>{ach.get('title','')}</b>: {ach.get('description','')}",
+                        f"• <b>{_safe_xml(ach.get('title',''))}</b>: {_safe_xml(ach.get('description',''))}",
                         bullet_st
                     ))
-                else:
-                    story.append(Paragraph(f"• {ach}", bullet_st))
+                elif ach:
+                    story.append(Paragraph(f"• {_safe_xml(ach)}", bullet_st))
 
         doc.build(story)
         return output_path
@@ -1219,18 +1304,12 @@ def render_pdf_bytes(content_json, template_name="classic"):
             section("Professional Summary")
             story.append(Paragraph(str(summary), body_st))
 
-        sk = content_json.get("skills") or {}
-        sk_normalized = {}
-        for k, v in sk.items():
-            if isinstance(v, list) and v:
-                sk_normalized[k.capitalize()] = v
-            elif isinstance(v, str) and v:
-                sk_normalized[k.capitalize()] = [tok.strip() for tok in v.split(',') if tok.strip()]
+        sk_dict = _normalize_skills_dict(content_json.get("skills"))
         all_sk_lines = []
-        for cat_label, vals in sk_normalized.items():
-            clean_vals = [s for s in vals if s]
+        for cat_label, vals in sk_dict.items():
+            clean_vals = [_safe_xml(s) for s in vals if s]
             if clean_vals:
-                all_sk_lines.append(f"<b>{cat_label}:</b> {', '.join(clean_vals)}")
+                all_sk_lines.append(f"<b>{_safe_xml(cat_label)}:</b> {', '.join(clean_vals)}")
         if all_sk_lines:
             section("Skills")
             for line in all_sk_lines:
@@ -1240,51 +1319,65 @@ def render_pdf_bytes(content_json, template_name="classic"):
         if education:
             section("Education")
             for edu in education:
-                deg   = edu.get("degree", "")
-                inst  = edu.get("institution", "")
-                yr    = edu.get("year", "")
-                cgpa  = f" | CGPA: {edu['cgpa']}" if edu.get("cgpa") else ""
-                field = f", {edu['field']}" if edu.get("field") else ""
-                story.append(Paragraph(f"<b>{deg}{field}</b>", job_title_st))
-                story.append(Paragraph(f"{inst}  {yr}{cgpa}", meta_st))
+                if isinstance(edu, dict):
+                    deg   = _safe_xml(edu.get("degree", ""))
+                    inst  = _safe_xml(edu.get("institution", ""))
+                    yr    = _safe_xml(edu.get("year", ""))
+                    cgpa  = f" | CGPA: {_safe_xml(edu['cgpa'])}" if edu.get("cgpa") else ""
+                    field = f", {_safe_xml(edu['field'])}" if edu.get("field") else ""
+                    story.append(Paragraph(f"<b>{deg}{field}</b>", job_title_st))
+                    story.append(Paragraph(f"{inst}  {yr}{cgpa}", meta_st))
+                elif edu:
+                    story.append(Paragraph(f"<b>{_safe_xml(edu)}</b>", job_title_st))
 
         experience = content_json.get("experience") or []
         if experience:
             section("Experience")
             for exp in experience:
-                title   = exp.get("title", "")
-                company = exp.get("company", "")
-                dur     = exp.get("duration", "")
-                if title or company:
-                    story.append(Paragraph(f"<b>{title}</b> — {company}", job_title_st))
-                    if dur:
-                        story.append(Paragraph(dur, meta_st))
-                for resp in (exp.get("responsibilities") or []):
-                    if resp:
-                        story.append(Paragraph(f"• {resp}", bullet_st))
-                story.append(Spacer(1, 4))
+                if isinstance(exp, dict):
+                    title   = _safe_xml(exp.get("title", ""))
+                    company = _safe_xml(exp.get("company", ""))
+                    dur     = _safe_xml(exp.get("duration", ""))
+                    if title or company:
+                        story.append(Paragraph(f"<b>{title}</b> — {company}", job_title_st))
+                        if dur:
+                            story.append(Paragraph(dur, meta_st))
+                    resps = exp.get("responsibilities") or ([exp.get("desc")] if exp.get("desc") else [])
+                    if isinstance(resps, str):
+                        resps = [resps]
+                    for resp in resps:
+                        if resp:
+                            story.append(Paragraph(f"• {_safe_xml(resp)}", bullet_st))
+                    story.append(Spacer(1, 4))
+                elif exp:
+                    story.append(Paragraph(f"<b>{_safe_xml(exp)}</b>", job_title_st))
 
         projects = content_json.get("projects") or []
         if projects:
             section("Projects")
             for proj in projects:
-                name    = proj.get("name", "")
-                tech    = proj.get("technologies", "")
-                desc    = proj.get("description", "")
-                bullets = proj.get("bullets") or []
-                gh      = proj.get("github", "")
-                header  = f"<b>{name}</b>"
-                if tech:
-                    header += f" <font color='#64748B' size='8'>| {tech}</font>"
-                story.append(Paragraph(header, job_title_st))
-                if desc and not bullets:
-                    story.append(Paragraph(desc, bullet_st))
-                for b in bullets:
-                    if b:
-                        story.append(Paragraph(f"• {b}", bullet_st))
-                if gh:
-                    story.append(Paragraph(f"<font color='#2563EB'>{gh}</font>", meta_st))
-                story.append(Spacer(1, 4))
+                if isinstance(proj, dict):
+                    name    = _safe_xml(proj.get("name", ""))
+                    tech    = _safe_xml(proj.get("technologies", ""))
+                    desc    = _safe_xml(proj.get("description", ""))
+                    bullets = proj.get("bullets") or []
+                    if isinstance(bullets, str):
+                        bullets = [bullets]
+                    gh      = _safe_xml(proj.get("github", ""))
+                    header  = f"<b>{name}</b>"
+                    if tech:
+                        header += f" <font color='#64748B' size='8'>| {tech}</font>"
+                    story.append(Paragraph(header, job_title_st))
+                    if desc and not bullets:
+                        story.append(Paragraph(desc, bullet_st))
+                    for b in bullets:
+                        if b:
+                            story.append(Paragraph(f"• {_safe_xml(b)}", bullet_st))
+                    if gh:
+                        story.append(Paragraph(f"<font color='#2563EB'>{gh}</font>", meta_st))
+                    story.append(Spacer(1, 4))
+                elif proj:
+                    story.append(Paragraph(f"<b>{_safe_xml(proj)}</b>", job_title_st))
 
         certs = content_json.get("certifications") or []
         if certs:
@@ -1292,10 +1385,10 @@ def render_pdf_bytes(content_json, template_name="classic"):
             for cert in certs:
                 if isinstance(cert, dict):
                     story.append(Paragraph(
-                        f"• <b>{cert.get('name','')}</b> — {cert.get('org','')} ({cert.get('year','')})",
+                        f"• <b>{_safe_xml(cert.get('name',''))}</b> — {_safe_xml(cert.get('org',''))} ({_safe_xml(cert.get('year',''))})",
                         bullet_st))
                 elif cert:
-                    story.append(Paragraph(f"• {cert}", bullet_st))
+                    story.append(Paragraph(f"• {_safe_xml(cert)}", bullet_st))
 
         achievements = content_json.get("achievements") or []
         if achievements:
@@ -1303,10 +1396,10 @@ def render_pdf_bytes(content_json, template_name="classic"):
             for ach in achievements:
                 if isinstance(ach, dict):
                     story.append(Paragraph(
-                        f"• <b>{ach.get('title','')}</b>: {ach.get('description','')}",
+                        f"• <b>{_safe_xml(ach.get('title',''))}</b>: {_safe_xml(ach.get('description',''))}",
                         bullet_st))
                 elif ach:
-                    story.append(Paragraph(f"• {ach}", bullet_st))
+                    story.append(Paragraph(f"• {_safe_xml(ach)}", bullet_st))
 
         doc.build(story)
         pdf_bytes = buf.getvalue()
@@ -1425,15 +1518,9 @@ def render_docx(content_json, template_name="classic", output_path=None):
             add_body(summary)
 
         # ── Skills ──────────────────────────────────────────────────────────
-        sk = content_json.get("skills", {})
-        sk_normalized = {}
-        for k, v in sk.items():
-            if isinstance(v, list) and v:
-                sk_normalized[k.capitalize()] = v
-            elif isinstance(v, str) and v:
-                sk_normalized[k.capitalize()] = [tok.strip() for tok in v.split(',') if tok.strip()]
+        sk_dict = _normalize_skills_dict(content_json.get("skills"))
         skill_lines = []
-        for cat_label, vals in sk_normalized.items():
+        for cat_label, vals in sk_dict.items():
             clean_vals = [s for s in vals if s]
             if clean_vals:
                 skill_lines.append((cat_label, ", ".join(clean_vals)))
@@ -1629,17 +1716,12 @@ def render_docx_bytes(content_json, template_name="classic"):
             add_section("Professional Summary")
             add_body(summary)
 
-        sk = content_json.get("skills") or {}
-        labels_map = {
-            "programming": "Programming", "frameworks": "Frameworks",
-            "databases": "Databases", "analytics": "Data & Analytics",
-            "tools": "Tools", "other": "Other",
-        }
+        sk_dict = _normalize_skills_dict(content_json.get("skills"))
         skill_lines = []
-        for key, label in labels_map.items():
-            vals = [s for s in (sk.get(key) or []) if s]
-            if vals:
-                skill_lines.append((label, ", ".join(vals)))
+        for cat_label, vals in sk_dict.items():
+            clean_vals = [s for s in vals if s]
+            if clean_vals:
+                skill_lines.append((cat_label, ", ".join(clean_vals)))
         if skill_lines:
             add_section("Skills")
             for label, val in skill_lines:
