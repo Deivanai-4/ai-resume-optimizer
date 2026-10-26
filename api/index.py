@@ -4,6 +4,7 @@ import sys
 # Ensure project root directory is on Python search path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from werkzeug.middleware.proxy_fix import ProxyFix
 from app import create_app
 
 
@@ -34,4 +35,7 @@ class VercelPathFixMiddleware:
 
 # Vercel discovers and invokes the WSGI application callable named 'app'
 app = create_app(os.environ.get('FLASK_CONFIG', 'production'))
+
+# Tell Flask it is behind Vercel's reverse proxy so HTTPS headers & cookies work
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.wsgi_app = VercelPathFixMiddleware(app.wsgi_app)
