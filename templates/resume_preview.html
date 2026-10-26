@@ -206,11 +206,16 @@ const CONTENT   = {{ gen.content_json | tojson }};
 
 // ── Helpers ──────────────────────────────────────────────────
 function getData(content) {
-    const c = content || {};
+    let c = content || {};
+    if (typeof c === 'string') {
+        try { c = JSON.parse(c); } catch (e) { c = {}; }
+    }
     const candidate = c.candidate || {};
     const skillsRaw = c.skills || [];
     const skillList = (() => {
+        const flat = [];
         const addSkill = (val) => {
+            if (!val) return;
             if (typeof val === 'string') {
                 val.split(',').forEach(tok => {
                     const clean = tok.trim();
@@ -218,8 +223,12 @@ function getData(content) {
                 });
             } else if (Array.isArray(val)) {
                 val.forEach(item => addSkill(item));
-            } else if (val && typeof val === 'object') {
-                Object.values(val).forEach(item => addSkill(item));
+            } else if (typeof val === 'object') {
+                if (val.name || val.skill_name) {
+                    flat.push(val.name || val.skill_name);
+                } else {
+                    Object.values(val).forEach(item => addSkill(item));
+                }
             }
         };
 
@@ -227,20 +236,27 @@ function getData(content) {
             skillsRaw.forEach(s => addSkill(s));
         } else if (skillsRaw && typeof skillsRaw === 'object') {
             Object.values(skillsRaw).forEach(v => addSkill(v));
+        } else if (typeof skillsRaw === 'string') {
+            addSkill(skillsRaw);
         }
         return [...new Set(flat.filter(Boolean))];
     })();
     return {
-        candidate, skillList,
-        experience: c.experience || [],
-        education: c.education || [],
-        projects: c.projects || [],
-        certs: c.certifications || [],
+        candidate,
+        skillList,
+        experience: Array.isArray(c.experience) ? c.experience : (c.experience ? [c.experience] : []),
+        education: Array.isArray(c.education) ? c.education : (c.education ? [c.education] : []),
+        projects: Array.isArray(c.projects) ? c.projects : (c.projects ? [c.projects] : []),
+        certs: Array.isArray(c.certifications) ? c.certifications : (c.certifications ? [c.certifications] : []),
+        achievements: Array.isArray(c.achievements) ? c.achievements : (c.achievements ? [c.achievements] : []),
         summary: c.professional_summary || '',
     };
 }
 
 function expBlock(e, accent) {
+    if (typeof e === 'string') {
+        return '<div style="margin-bottom:8px;font-size:11pt;color:#334155;">' + e + '</div>';
+    }
     const bullets = e.bullets || e.responsibilities || [];
     return '<div style="margin-bottom:14px;">'
         + '<div style="display:flex;justify-content:space-between;align-items:baseline;">'
@@ -248,12 +264,15 @@ function expBlock(e, accent) {
         + '<span style="font-size:10.5pt;color:#64748b;">' + (e.duration||'') + '</span></div>'
         + '<div style="color:'+accent+';font-size:11pt;font-weight:600;margin-bottom:4px;">' + (e.company||'') + '</div>'
         + (bullets.length ? '<ul style="margin:4px 0 0 20px;padding:0;">'
-            + (Array.isArray(bullets)?bullets:[bullets]).map(b=>'<li style="font-size:10.5pt;color:#334155;margin-bottom:3px;">'+b+'</li>').join('')
+            + (Array.isArray(bullets)?bullets:[bullets]).map(b=>'<li style="font-size:10.5pt;color:#334155;margin-bottom:3px;">'+(typeof b==='string'?b:(b.desc||b.text||''))+'</li>').join('')
             + '</ul>' : (e.description ? '<p style="font-size:10.5pt;color:#334155;margin:4px 0 0;">'+e.description+'</p>' : ''))
         + '</div>';
 }
 
 function eduBlock(e) {
+    if (typeof e === 'string') {
+        return '<div style="margin-bottom:8px;font-size:11pt;color:#334155;">' + e + '</div>';
+    }
     return '<div style="margin-bottom:12px;">'
         + '<div style="display:flex;justify-content:space-between;align-items:baseline;">'
         + '<span style="font-weight:700;font-size:12pt;">' + (e.degree||'') + (e.field?' in '+e.field:'') + '</span>'
@@ -264,6 +283,9 @@ function eduBlock(e) {
 }
 
 function projBlock(p, accent) {
+    if (typeof p === 'string') {
+        return '<div style="margin-bottom:8px;font-size:11pt;color:#334155;">' + p + '</div>';
+    }
     const bullets = p.bullets || (p.description ? [p.description] : []);
     return '<div style="margin-bottom:12px;">'
         + '<div style="display:flex;justify-content:space-between;align-items:baseline;">'
@@ -271,21 +293,32 @@ function projBlock(p, accent) {
         + (p.github ? '<a href="'+p.github+'" style="font-size:10pt;color:'+accent+';margin-left:8px;" target="_blank">GitHub</a>' : '')
         + '</div>'
         + (bullets.length ? '<ul style="margin:4px 0 0 20px;padding:0;">'
-            + (Array.isArray(bullets)?bullets:[bullets]).map(b=>'<li style="font-size:10.5pt;color:#334155;margin-bottom:3px;">'+b+'</li>').join('')
+            + (Array.isArray(bullets)?bullets:[bullets]).map(b=>'<li style="font-size:10.5pt;color:#334155;margin-bottom:3px;">'+(typeof b==='string'?b:(b.desc||b.text||''))+'</li>').join('')
             + '</ul>' : (p.description ? '<div style="font-size:10.5pt;color:#334155;margin-top:3px;">' + p.description + '</div>' : ''))
         + ((p.technologies||p.tech_stack) ? '<div style="font-size:10pt;color:#64748b;font-style:italic;margin-top:2px;">Technologies: '+( p.technologies||p.tech_stack)+'</div>' : '')
         + '</div>';
 }
 
 function certBlock(c) {
+    if (typeof c === 'string') {
+        return '<div style="font-size:11pt;margin-bottom:6px;">• <strong>'+c+'</strong></div>';
+    }
     return '<div style="font-size:11pt;margin-bottom:6px;"><strong>'+(c.name||c.cert_name||'')+'</strong>'
-        + ((c.issuer||c.issuing_org) ? ' — '+(c.issuer||c.issuing_org) : '')
+        + ((c.issuer||c.issuing_org||c.org) ? ' — '+(c.issuer||c.issuing_org||c.org) : '')
         + ((c.year||c.issue_date) ? ' ('+(c.year||c.issue_date)+')' : '') + '</div>';
+}
+
+function achBlock(a) {
+    if (typeof a === 'string') {
+        return '<div style="font-size:11pt;color:#334155;margin-bottom:6px;">• ' + a + '</div>';
+    }
+    return '<div style="font-size:11pt;color:#334155;margin-bottom:6px;"><strong>• ' + (a.title || '') + '</strong>'
+        + (a.description ? ': ' + a.description : '') + '</div>';
 }
 
 // ── Template 1: Classic ATS ───────────────────────────────────
 function renderClassicAts(content) {
-    const {candidate,skillList,experience,education,projects,certs,summary} = getData(content);
+    const {candidate,skillList,experience,education,projects,certs,achievements,summary} = getData(content);
     const A = '#1E3A5F';
     const SH = (label) => '<div style="font-size:13pt;font-weight:800;color:'+A+';text-transform:uppercase;letter-spacing:1.2px;border-bottom:2px solid '+A+';padding-bottom:4px;margin:20px 0 12px;">'+label+'</div>';
     return '<div style="font-family:Georgia,serif;color:#1e293b;line-height:1.6;font-size:11pt;padding:48px 56px;">'
@@ -303,12 +336,13 @@ function renderClassicAts(content) {
         + (education.length ? SH('Education')+education.map(e=>eduBlock(e)).join('') : '')
         + (projects.length ? SH('Projects')+projects.map(p=>projBlock(p,A)).join('') : '')
         + (certs.length ? SH('Certifications')+certs.map(c=>certBlock(c)).join('') : '')
+        + (achievements.length ? SH('Key Achievements')+achievements.map(a=>achBlock(a)).join('') : '')
         + '</div>';
 }
 
 // ── Template 2: Modern Professional ──────────────────────────
 function renderModernPro(content) {
-    const {candidate,skillList,experience,education,projects,certs,summary} = getData(content);
+    const {candidate,skillList,experience,education,projects,certs,achievements,summary} = getData(content);
     const A = '#4F46E5';
     const SH = (label) => '<div style="font-size:12.5pt;font-weight:700;color:'+A+';text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid '+A+'30;padding-bottom:5px;margin:20px 0 14px;">'+label+'</div>';
     return '<div style="font-family:Inter,Arial,sans-serif;color:#1e293b;line-height:1.6;font-size:11pt;">'
@@ -327,12 +361,13 @@ function renderModernPro(content) {
         + (education.length ? SH('Education')+education.map(e=>eduBlock(e)).join('') : '')
         + (projects.length ? SH('Projects')+projects.map(p=>projBlock(p,A)).join('') : '')
         + (certs.length ? SH('Certifications')+certs.map(c=>certBlock(c)).join('') : '')
+        + (achievements.length ? SH('Achievements')+achievements.map(a=>achBlock(a)).join('') : '')
         + '</div></div>';
 }
 
 // ── Template 3: Minimal ATS ───────────────────────────────────
 function renderMinimalAts(content) {
-    const {candidate,skillList,experience,education,projects,certs,summary} = getData(content);
+    const {candidate,skillList,experience,education,projects,certs,achievements,summary} = getData(content);
     const SH = (label) => '<div style="font-size:12.5pt;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#374151;border-top:1px solid #D1D5DB;padding-top:16px;margin:16px 0 10px;">'+label+'</div>';
     return '<div style="font-family:Arial,Helvetica,sans-serif;color:#111827;line-height:1.65;font-size:11.5pt;padding:52px 60px;">'
         + '<div style="margin-bottom:24px;">'
@@ -351,12 +386,13 @@ function renderMinimalAts(content) {
         + (projects.length ? SH('Projects')+projects.map(p=>'<div style="margin-bottom:10px;"><span style="font-weight:600;">'+(p.name||p.title||'')+' </span>'
             +((p.technologies||p.tech_stack)?'('+( p.technologies||p.tech_stack)+') ':'')+' <div style="font-size:10.5pt;color:#374151;">'+( p.description||'')+'</div></div>').join('') : '')
         + (certs.length ? SH('Certifications')+certs.map(c=>certBlock(c)).join('') : '')
+        + (achievements.length ? SH('Achievements')+achievements.map(a=>achBlock(a)).join('') : '')
         + '</div>';
 }
 
 // ── Template 4: Profile / Sidebar ────────────────────────────
 function renderProfilePhoto(content) {
-    const {candidate,skillList,experience,education,projects,certs,summary} = getData(content);
+    const {candidate,skillList,experience,education,projects,certs,achievements,summary} = getData(content);
     const A = '#0F766E';
     const sidebar = '<div style="background:#F0FDF4;width:240px;min-height:1100px;flex-shrink:0;padding:36px 24px;box-sizing:border-box;">'
         + '<div style="width:84px;height:84px;border-radius:50%;background:'+A+'20;border:3px solid '+A+';display:flex;align-items:center;justify-content:center;font-size:28pt;font-weight:800;color:'+A+';margin:0 auto 16px;">'+(candidate.name||'?')[0].toUpperCase()+'</div>'
@@ -380,13 +416,14 @@ function renderProfilePhoto(content) {
         + (education.length ? SH('Education')+education.map(e=>eduBlock(e)).join('') : '')
         + (projects.length ? SH('Projects')+projects.map(p=>projBlock(p,A)).join('') : '')
         + (certs.length ? SH('Certifications')+certs.map(c=>certBlock(c)).join('') : '')
+        + (achievements.length ? SH('Achievements')+achievements.map(a=>achBlock(a)).join('') : '')
         + '</div>';
     return '<div style="display:flex;min-height:1100px;font-family:Roboto,Arial,sans-serif;color:#1e293b;font-size:11.5pt;">'+sidebar+main+'</div>';
 }
 
 // ── Template 5: Technical / Developer ────────────────────────
 function renderTechDev(content) {
-    const {candidate,skillList,experience,education,projects,certs,summary} = getData(content);
+    const {candidate,skillList,experience,education,projects,certs,achievements,summary} = getData(content);
     const A = '#818CF8'; const BG = '#0F172A';
     const SH = (l) => '<div style="font-size:12pt;font-weight:700;color:'+A+';text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid '+A+';padding-bottom:5px;margin:22px 0 14px;">// '+l+'</div>';
     return '<div style="font-family:\'Fira Code\',Consolas,monospace;color:#1e293b;line-height:1.6;font-size:10.5pt;">'
@@ -405,20 +442,37 @@ function renderTechDev(content) {
         + (projects.length ? SH('Projects')+projects.map(p=>projBlock(p,'#4F46E5')).join('') : '')
         + (education.length ? SH('Education')+education.map(e=>eduBlock(e)).join('') : '')
         + (certs.length ? SH('Certifications')+certs.map(c=>certBlock(c)).join('') : '')
+        + (achievements.length ? SH('Achievements')+achievements.map(a=>achBlock(a)).join('') : '')
         + '</div></div>';
 }
 
 // ── Dispatcher ───────────────────────────────────────────────
 function renderResume(template, content) {
-    let html = '';
-    switch (template) {
-        case 'modern_pro':    html = renderModernPro(content);    break;
-        case 'minimal_ats':   html = renderMinimalAts(content);   break;
-        case 'profile_photo': html = renderProfilePhoto(content); break;
-        case 'tech_dev':      html = renderTechDev(content);      break;
-        default:              html = renderClassicAts(content);   break;
+    try {
+        let html = '';
+        switch (template) {
+            case 'modern_pro':
+            case 'modern':        html = renderModernPro(content);    break;
+            case 'minimal_ats':
+            case 'minimal':       html = renderMinimalAts(content);   break;
+            case 'profile_photo': html = renderProfilePhoto(content); break;
+            case 'tech_dev':      html = renderTechDev(content);      break;
+            case 'classic_ats':
+            case 'classic':
+            default:              html = renderClassicAts(content);   break;
+        }
+        const target = document.getElementById('resumeRenderTarget');
+        if (target) {
+            target.innerHTML = html;
+        }
+    } catch (err) {
+        console.error("renderResume error:", err);
+        const target = document.getElementById('resumeRenderTarget');
+        if (target) {
+            target.innerHTML = '<div style="padding:40px;color:#ef4444;text-align:center;">' +
+                '<h3>Unable to display preview</h3><p>' + err.message + '</p></div>';
+        }
     }
-    document.getElementById('resumeRenderTarget').innerHTML = html;
 }
 
 // ── Template change ─────────────────────────────────────────
